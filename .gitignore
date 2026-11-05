@@ -1,0 +1,9 @@
+node_modules/
+dist/
+reports/
+playwright-report/
+test-results/
+.env
+/src/devlog/*/
+/public/*
+!/public/CNAME

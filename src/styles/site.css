@@ -1,0 +1,458 @@
+@import "../assets/fonts/fonts.css";
+
+:root {
+  --font-heading: "Shippori Mincho", "Shippori Mincho Fallback", "Times New Roman", serif;
+  --font-body: "Hanken Grotesk", "Hanken Grotesk Fallback", Arial, sans-serif;
+  --radius: 10px;
+  --border: color-mix(in srgb, var(--color-ink) 22%, transparent);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  background-image: var(--tex);
+  color: var(--color-ink);
+  font: 400 1.0625rem / 1.6 var(--font-body);
+}
+
+main {
+  padding-block: 40px 64px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 0.5em;
+}
+
+h1 {
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+}
+
+a {
+  color: var(--color-accent);
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.container {
+  width: min(100% - 32px, 960px);
+  margin-inline: auto;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-header {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--color-paper) 85%, transparent);
+}
+
+.brand {
+  margin-right: auto;
+  font: 700 1.25rem / 1 var(--font-heading);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+/* Перемикач теми: прихований без JS (клас .js ставить inline-скрипт у <head>) */
+.theme-switch {
+  display: none;
+  margin: 0;
+  min-inline-size: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+  background: var(--color-paper);
+}
+
+.js .theme-switch {
+  display: inline-flex;
+}
+
+.theme-switch button {
+  font: 600 0.8125rem / 1 var(--font-body);
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.theme-switch button[aria-pressed="true"] {
+  background: var(--color-ink);
+  color: var(--color-bg);
+}
+
+.btn {
+  display: inline-block;
+  font: 700 1rem / 1 var(--font-body);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  padding: 14px 30px;
+  border-radius: 999px;
+  box-shadow: 0 2px 0 var(--color-ink);
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn {
+    transition: transform 0.12s ease;
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* ---- Шаблон: skip-link, навігація, футер ---- */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  background: var(--color-ink);
+  color: var(--color-bg);
+  padding: 10px 14px;
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+.header-inner {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.main-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.main-nav a {
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.main-nav a:hover,
+.main-nav a[aria-current="page"] {
+  border-bottom-color: var(--color-accent);
+}
+
+.gh-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gh-link:hover {
+  color: var(--color-accent);
+}
+
+.site-footer {
+  margin-top: 48px;
+  padding: 28px 0 36px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--color-paper) 85%, transparent);
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+}
+
+.site-footer p {
+  margin: 0 0 6px;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+/* ---- Контент ---- */
+.lead {
+  font-size: 1.1875rem;
+  max-width: 62ch;
+}
+
+.prose {
+  max-width: 760px;
+}
+
+.prose h2 {
+  margin-top: 1.6em;
+  font-size: 1.5rem;
+}
+
+.prose li {
+  margin-bottom: 0.4em;
+}
+
+.muted,
+.meta {
+  color: var(--color-muted);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink);
+  border: 2px solid var(--color-ink);
+  box-shadow: none;
+  padding: 12px 26px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.card {
+  background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.card h2 {
+  font-size: 1.25rem;
+}
+
+.card p {
+  margin: 0;
+}
+
+.post-list {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.post-card {
+  background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.post-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.375rem;
+}
+
+.post-card .meta,
+.post-card p {
+  margin: 0 0 6px;
+}
+
+.keys {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0 24px;
+}
+
+.keys th,
+.keys td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+kbd {
+  font: 600 0.875rem var(--font-body);
+  background: var(--color-paper);
+  border: 1px solid var(--border);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+
+.notice {
+  background: var(--color-paper);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+}
+
+.game-wrap {
+  position: relative;
+  width: min(100%, calc((100dvh - 120px) * 16 / 9));
+  margin-inline: auto;
+}
+
+.game-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--color-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Підказка для портретної орієнтації на сенсорних пристроях */
+.rotate-hint {
+  display: none;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate-hint {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+    font: 700 1.5rem var(--font-heading);
+    z-index: 2;
+    border-radius: var(--radius);
+    text-align: center;
+  }
+
+  .game-wrap {
+    width: 100%;
+  }
+}
+
+/* Телефон у ландшафті: гра на весь екран, шапка й футер не заважають */
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 600px) {
+  .game-wrap {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    z-index: 5;
+    background: var(--color-bg);
+  }
+
+  .game-frame {
+    height: 100%;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+/* ---- Згода на аналітику ---- */
+.link-button {
+  font: inherit;
+  color: var(--color-accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+/* Без JS кнопка нічого не зробить, тож ховаємо */
+[data-cookie-settings] {
+  display: none;
+}
+
+.js [data-cookie-settings] {
+  display: inline;
+}
+
+.consent-banner {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 14px max(16px, env(safe-area-inset-left)) calc(14px + env(safe-area-inset-bottom));
+  background: var(--color-paper);
+  color: var(--color-ink);
+  border-top: 3px solid var(--color-ink);
+  box-shadow: 0 -6px 24px color-mix(in srgb, var(--color-ink) 18%, transparent);
+}
+
+.consent-banner[hidden] {
+  display: none;
+}
+
+.consent-banner:focus {
+  outline: none;
+}
+
+.consent-text {
+  margin: 0;
+  flex: 1 1 360px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Обидві кнопки однакової помітності: однаковий вигляд і розмір */
+.consent-btn {
+  font: 700 1rem / 1 var(--font-body);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  border: 2px solid var(--color-ink);
+  border-radius: 999px;
+  padding: 12px 26px;
+  min-width: 112px;
+  cursor: pointer;
+}
+
+.consent-btn:hover {
+  background: var(--color-shade);
+}

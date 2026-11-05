@@ -1,0 +1,31 @@
+# Лише для локального запуску; на GitHub Pages заголовками керує GitHub.
+# {$BASE_PATH} береться зі змінної середовища образу (наприклад, / або /origami-ninja/).
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	root * /srv
+	encode gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Файли з хешем (Vite кладе їх і шрифти в assets/) кешуються назавжди, решта — no-cache.
+	@hashed path {$BASE_PATH}assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+	@other not path {$BASE_PATH}assets/*
+	header @other Cache-Control "no-cache"
+
+	# Неіснуючий URL → кастомна 404 зі статусом 404.
+	handle_errors {
+		rewrite * {$BASE_PATH}404.html
+		file_server
+	}
+
+	# /play редиректиться на /play/ автоматично (каталог з index.html).
+	file_server
+}
