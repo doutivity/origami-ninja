@@ -6,7 +6,7 @@ import { blinkVisible, Health } from "../combat/health.ts";
 import { emptyInput, type InputState } from "../input/input-state.ts";
 import { type FrameName, TEX } from "../scenes/BootScene.ts";
 import { tuning } from "../tuning.ts";
-import type { PlayerContext } from "./context.ts";
+import type { PlayerContext, StateName } from "./context.ts";
 import { tiltOf } from "./glide-model.ts";
 import { StateMachine } from "./state-machine.ts";
 import { DeadState } from "./states/dead.ts";
@@ -44,6 +44,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** Чи в зоні висхідного вітру (виставляє GameScene) */
   inWind = false;
   private runClock = 0;
+  private idleClock = 0;
+  private foldMs = 0;
+  private prevState: StateName = "fall";
 
   constructor(scene: Phaser.Scene, x: number, feetY: number) {
     super(scene, x, feetY - FEET_BELOW_CENTER, TEX.ninja("idle"));
@@ -183,7 +186,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private frameFor(ctx: PlayerContext): FrameName {
     const state = this.machine.name;
-    if (state === "hurt" || state === "dead") return "fall";
+    if (state === "dead") return "fall";
+    if (state === "hurt") return "hurt";
+    // Складання в літачок і назад: короткий проміжний кадр замість миттєвої підміни
+    if (state !== this.prevState && (state === "glide" || this.prevState === "glide")) {
+      this.foldMs = tuning.player.foldMs;
+    }
+    this.prevState = state;
+    if (this.foldMs > 0) {
+      this.foldMs -= ctx.dt * 1000;
+      return "fold";
+    }
     if (state === "glide") return "glide";
     if (this.attack.busy) return "attack";
     switch (state) {
@@ -196,7 +209,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         return "fall";
       default:
         this.runClock = 0;
-        return "idle";
+        // «Дихання»: два кадри idle по черзі
+        this.idleClock += ctx.dt * 1000;
+        return Math.floor(this.idleClock / tuning.player.idleFrameMs) % 2 === 0 ? "idle" : "idle2";
     }
   }
 

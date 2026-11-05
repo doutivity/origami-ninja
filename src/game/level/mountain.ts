@@ -21,7 +21,7 @@ export const mountain: LevelDef = {
     { x: 2350, y: 440, patrolLeft: 2200, patrolRight: 2520 },
   ],
   // Прірва 1700…2040 без платформ: без планера її не пройти
-  winds: [{ x: 1810, y: 160, width: 120, height: 400 }],
+  winds: [{ x: 1830, y: 120, width: 100, height: 280 }],
   checkpoints: [
     { x: 1040, y: 440 },
     { x: 1650, y: 440 },
