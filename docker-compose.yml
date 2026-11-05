@@ -1,0 +1,124 @@
+name: origami-ninja
+
+services:
+  # Dev-сервер: код змонтований, node_modules в іменованому volume.
+  dev:
+    build:
+      context: .
+      target: dev
+      args:
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    image: origami-ninja-dev
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      BASE_PATH: "/"
+      SITE_URL: "http://localhost:5173"
+      GA_MEASUREMENT_ID: ""
+      GTM_CONTAINER_ID: ""
+      HOME: /tmp
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
+  # Лише для `just install`: порожній образ без залежностей (lock ще може не існувати).
+  tools:
+    build:
+      context: .
+      target: base
+      args:
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    image: origami-ninja-base
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    profiles: ["tools"]
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
+  # Продакшн-образ (Caddy) на 8080.
+  web:
+    build:
+      context: .
+      target: runtime
+      args:
+        SITE_URL: ${SITE_URL:-http://localhost:8080}
+        BASE_PATH: ${BASE_PATH:-/}
+        GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
+        GTM_CONTAINER_ID: ${GTM_CONTAINER_ID:-}
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    image: origami-ninja-web
+    ports:
+      - "8080:8080"
+
+  # --- e2e (profile "e2e"): сайт у режимі GitHub Pages із тестовим GA ID + Playwright ---
+  web-e2e:
+    build:
+      context: .
+      target: runtime
+      args:
+        SITE_URL: "http://web-e2e:8080/origami-ninja"
+        BASE_PATH: "/origami-ninja/"
+        GA_MEASUREMENT_ID: "G-E2ETEST123"
+        GTM_CONTAINER_ID: ""
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    image: origami-ninja-web-e2e
+    profiles: ["e2e"]
+
+  e2e:
+    build:
+      context: .
+      target: e2e
+    image: origami-ninja-e2e
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    profiles: ["e2e"]
+    depends_on:
+      web-e2e:
+        condition: service_healthy
+    environment:
+      BASE_URL: "http://web-e2e:8080/origami-ninja/"
+      CI: ${CI:-}
+      HOME: /tmp
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+
+  # Lighthouse CI на тому ж сайті (Chromium із образу Playwright). Звіти: ./reports/lighthouse
+  lighthouse:
+    build:
+      context: .
+      target: e2e
+    image: origami-ninja-e2e
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    profiles: ["e2e"]
+    # Спільна мережа з web-e2e: сайт доступний як localhost:8080. Lighthouse вважає localhost
+    # безпечним джерелом, тож HTTPS-аудити не дають хибних провалів (на Pages сайт і так по HTTPS).
+    network_mode: "service:web-e2e"
+    depends_on:
+      web-e2e:
+        condition: service_healthy
+    # Тека, у яку LHCI пише тимчасові файли, має бути доступною для запису користувачу
+    working_dir: /tmp
+    environment:
+      BASE_URL: "http://localhost:8080/origami-ninja/"
+      LHCI_OUT: /app/reports/lighthouse
+      HOME: /tmp
+    volumes:
+      - ./reports:/app/reports
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        export CHROME_PATH="$$(cd /app && node -e 'console.log(require("@playwright/test").chromium.executablePath())')"
+        for profile in desktop mobile; do
+          echo "== Lighthouse CI: $$profile =="
+          /app/node_modules/.bin/lhci autorun --config=/app/lighthouse/$$profile.cjs
+        done
+
+volumes:
+  node_modules:

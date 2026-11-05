@@ -1,0 +1,72 @@
+// Перевірка даних рівня: повертає список помилок (порожній — рівень коректний).
+import { tuning } from "../tuning.ts";
+import type { LevelDef, PlatformDef } from "./types.ts";
+
+const t = tuning.player;
+
+/** Максимальна дальність стрибка без планера на місці виконання розбігу, px (з запасом). */
+export const maxPlainJumpDistance = (): number => {
+  const airtime = (2 * t.jumpVelocity) / t.gravity;
+  return t.runSpeed * airtime;
+};
+
+const topOf = (pl: PlatformDef) => pl.y;
+const under = (platforms: PlatformDef[], x: number, y: number): PlatformDef | undefined =>
+  platforms.find((p) => x >= p.x && x <= p.x + p.width && Math.abs(topOf(p) - y) < 1);
+
+export function validateLevel(level: LevelDef): string[] {
+  const errors: string[] = [];
+  const inWorld = (x: number, y: number) =>
+    x >= 0 && x <= level.width && y >= 0 && y <= level.height;
+  const err = (m: string) => errors.push(m);
+
+  if (level.platforms.length === 0) err("no platforms");
+  level.platforms.forEach((p, i) => {
+    if (p.width <= 0 || p.height <= 0) err(`platform ${i}: non-positive size`);
+    if (p.x < 0 || p.x + p.width > level.width)
+      err(`platform ${i}: outside the world horizontally`);
+  });
+  if (!under(level.platforms, level.spawn.x, level.spawn.y))
+    err("spawn is not standing on a platform");
+
+  level.enemies.forEach((e, i) => {
+    const pl = under(level.platforms, e.x, e.y);
+    if (!pl) {
+      err(`enemy ${i}: not standing on a platform`);
+      return;
+    }
+    if (e.patrolLeft >= e.patrolRight) err(`enemy ${i}: patrol range is empty`);
+    if (e.patrolLeft < pl.x || e.patrolRight > pl.x + pl.width)
+      err(`enemy ${i}: patrol leaves its platform`);
+    if (e.x < e.patrolLeft || e.x > e.patrolRight)
+      err(`enemy ${i}: starts outside its patrol range`);
+  });
+
+  level.fires.forEach((f, i) => {
+    if (f.width <= 0 || f.height <= 0) err(`fire ${i}: non-positive size`);
+    if (!under(level.platforms, f.x + f.width / 2, f.y + f.height))
+      err(`fire ${i}: not standing on a platform`);
+  });
+  level.winds.forEach((w, i) => {
+    if (w.width <= 0 || w.height <= 0) err(`wind ${i}: non-positive size`);
+    if (!inWorld(w.x, w.y)) err(`wind ${i}: outside the world`);
+  });
+  level.checkpoints.forEach((c, i) => {
+    if (!under(level.platforms, c.x, c.y)) err(`checkpoint ${i}: not standing on a platform`);
+  });
+  if (level.checkpoints.length === 0) err("no checkpoints");
+  if (!under(level.platforms, level.finish.x, level.finish.y))
+    err("finish is not standing on a platform");
+  if (level.finish.x < level.spawn.x) err("finish is left of the spawn");
+
+  // Хоча б одна прірва, яку без планера не пройти
+  const sorted = [...level.platforms].sort((a, b) => a.x - b.x);
+  let widest = 0;
+  let reach = sorted[0] ? sorted[0].x + sorted[0].width : 0;
+  for (const p of sorted.slice(1)) {
+    widest = Math.max(widest, p.x - reach);
+    reach = Math.max(reach, p.x + p.width);
+  }
+  if (widest <= maxPlainJumpDistance()) err("level has no gap that requires the glider");
+  return errors;
+}

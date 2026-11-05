@@ -1,0 +1,359 @@
+import Phaser from "phaser";
+import { boxesOverlap } from "../combat/geometry.ts";
+import { Enemy } from "../enemies/enemy.ts";
+import { currentPalette, debugMode, hexToNumber, renderScale } from "../env.ts";
+import { type DeathCause, GAME_EVENTS } from "../events.ts";
+import { BurnOverlay } from "../fire/burn-overlay.ts";
+import { FireZone } from "../fire/fire-zone.ts";
+import { InputHub } from "../input/hub.ts";
+import { mountain } from "../level/mountain.ts";
+import { Checkpoint } from "../objects/checkpoint.ts";
+import { Shadows } from "../objects/shadows.ts";
+import { Player } from "../player/player.ts";
+import {
+  getGovernor,
+  getQuality,
+  type QualityGovernor,
+  qualityProfile,
+  setQuality,
+} from "../quality.ts";
+import { tuning } from "../tuning.ts";
+import { WindZone } from "../wind/wind-zone.ts";
+import { TEX } from "./BootScene.ts";
+
+type Phase = "playing" | "dead" | "complete";
+
+export class GameScene extends Phaser.Scene {
+  private hub!: InputHub;
+  private player!: Player;
+  private bg!: Phaser.GameObjects.Image;
+  private enemies: Enemy[] = [];
+  private fires: FireZone[] = [];
+  private winds: WindZone[] = [];
+  private checkpoints: Checkpoint[] = [];
+  private shadows!: Shadows;
+  private overlay!: BurnOverlay;
+  private playerEmbers!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private hitboxGfx?: Phaser.GameObjects.Graphics;
+  private governor!: QualityGovernor;
+  private cullTimer = 0;
+  private lastHp = -1;
+  private phase: Phase = "playing";
+  private runMs = 0;
+  private overlayShownAt = 0;
+  /** Мітка часу попереднього кадру: delta у Phaser згладжена, а для FPS потрібна сира */
+  private lastFrameTime = 0;
+
+  constructor() {
+    super("GameScene");
+  }
+
+  create(): void {
+    const el = document.getElementById("game");
+    if (el) el.dataset.scene = "GameScene";
+    const level = mountain;
+    const rs = renderScale();
+    const cam = this.cameras.main;
+    cam.setBackgroundColor(hexToNumber(currentPalette().paper));
+    cam.setZoom(rs);
+    this.enemies = [];
+    this.fires = [];
+    this.winds = [];
+    this.checkpoints = [];
+    this.cullTimer = 0;
+    this.lastHp = -1;
+    this.phase = "playing";
+    this.overlayShownAt = 0;
+    this.lastFrameTime = 0;
+    this.runMs = (this.registry.get("runMs") as number | undefined) ?? 0;
+    const cpIndex = (this.registry.get("checkpoint") as number | undefined) ?? -1;
+    this.registry.set("overlay", null);
+    this.governor = getGovernor();
+
+    // Паралакс рахуємо вручну від вікна камери: scrollFactor разом із zoom зсуває фон по вертикалі
+    this.bg = this.add.image(0, 0, TEX.bg).setOrigin(0, 0).setDepth(-10);
+
+    // Платформи: видимі картинки + статичні фізичні тіла
+    const solids: Phaser.GameObjects.Zone[] = [];
+    level.platforms.forEach((pl, i) => {
+      this.add
+        .image(pl.x, pl.y, TEX.platform(i))
+        .setOrigin(0, 0)
+        .setScale(1 / rs);
+      const zone = this.add.zone(pl.x + pl.width / 2, pl.y + pl.height / 2, pl.width, pl.height);
+      this.physics.add.existing(zone, true);
+      solids.push(zone);
+    });
+
+    this.physics.world.setBounds(
+      0,
+      0,
+      level.width,
+      level.height + tuning.world.fallLimit * 4,
+      true,
+      true,
+      true,
+      false,
+    );
+    this.hub = new InputHub(this);
+    const spawn = cpIndex >= 0 ? (level.checkpoints[cpIndex] ?? level.spawn) : level.spawn;
+    this.player = new Player(this, spawn.x, spawn.y);
+    this.physics.add.collider(this.player, solids);
+
+    for (const def of level.enemies) this.enemies.push(new Enemy(this, def));
+    this.physics.add.collider(this.enemies, solids);
+    this.physics.add.overlap(this.player, this.enemies, (_p, e) => this.onEnemyContact(e as Enemy));
+
+    this.checkpoints = level.checkpoints.map((c, i) => new Checkpoint(this, c, i <= cpIndex));
+    this.add
+      .image(level.finish.x, level.finish.y, TEX.finish)
+      .setOrigin(0.5, 1)
+      .setScale(level.finish.height / 140 / 2)
+      .setDepth(5);
+
+    for (const def of level.winds) this.winds.push(new WindZone(this, def, currentPalette()));
+
+    // Вогонь: зони й іскри на гравцеві (обидва з жорсткими лімітами частинок)
+    const pal = currentPalette();
+    const colors = [hexToNumber(pal.fire), hexToNumber(pal.accent), hexToNumber(pal.paper)];
+    for (const def of level.fires) this.fires.push(new FireZone(this, def, colors));
+    this.playerEmbers = this.add
+      .particles(0, 0, TEX.ember, {
+        follow: this.player,
+        followOffset: { x: 0, y: -4 },
+        x: { min: -14, max: 14 },
+        y: { min: -30, max: 26 },
+        lifespan: { min: 400, max: 800 },
+        speedY: { min: -140, max: -60 },
+        speedX: { min: -30, max: 30 },
+        scale: { start: 0.8, end: 0 },
+        alpha: { start: 1, end: 0 },
+        color: colors,
+        frequency: tuning.particles.emitEveryMs,
+        emitting: false,
+        maxAliveParticles: tuning.particles.maxOnPlayer,
+      })
+      .setDepth(12);
+    this.overlay = new BurnOverlay(this, this.player.frameName);
+
+    this.shadows = new Shadows(this);
+    this.shadows.add(this.player, (124 - 64) * tuning.player.spriteScale - 4, 54);
+    for (const e of this.enemies)
+      this.shadows.add(e, (116 - 60) * tuning.enemy.spriteScale - 2, 50);
+
+    cam.setBounds(0, 0, level.width, level.height);
+    cam.startFollow(this.player, true, tuning.camera.lerp, tuning.camera.lerp);
+    cam.setDeadzone(tuning.camera.deadzone.width, tuning.camera.deadzone.height);
+
+    if (debugMode) this.hitboxGfx = this.add.graphics().setDepth(50);
+
+    this.applyQuality();
+    this.game.events.on(GAME_EVENTS.overlayAction, this.onOverlayAction, this);
+    this.scene.launch("UIScene", { hub: this.hub });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(GAME_EVENTS.overlayAction, this.onOverlayAction, this);
+      this.scene.stop("UIScene");
+    });
+    if (!this.registry.get("runStarted")) {
+      this.registry.set("runStarted", true);
+      this.game.events.emit(GAME_EVENTS.levelStart, { level: level.id });
+    }
+  }
+
+  private onEnemyContact(enemy: Enemy): void {
+    if (enemy.dead || this.phase !== "playing") return;
+    this.player.takeDamage(tuning.enemy.contactDamage, enemy.x);
+  }
+
+  update(time: number, delta: number): void {
+    const rawDelta = this.lastFrameTime > 0 ? time - this.lastFrameTime : 0;
+    this.lastFrameTime = time;
+    const input = this.hub.poll();
+    if (input.restartPressed) {
+      this.onOverlayAction();
+      if (this.phase === "playing") this.respawn();
+      return;
+    }
+    if (this.phase === "playing") this.runMs += delta;
+
+    this.player.tick(input, delta);
+    const view = this.cameras.main.worldView;
+    this.bg.setPosition(view.x * 0.7, view.y);
+    for (const e of this.enemies) e.tick(delta);
+    this.enemies = this.enemies.filter((e) => e.active);
+
+    this.applyFire(delta);
+    this.applySwordHits();
+    this.syncHud();
+    this.shadows.update((s) => (s.body as Phaser.Physics.Arcade.Body).blocked.down);
+    if (this.phase === "playing") this.updateProgress();
+
+    if (this.governor.update(rawDelta) === "downgrade") this.downgrade();
+  }
+
+  /** Смерть, чекпоінти й фініш. */
+  private updateProgress(): void {
+    const level = mountain;
+    const b = this.player.body as Phaser.Physics.Arcade.Body;
+    const box = { x: b.x, y: b.y, width: b.width, height: b.height };
+
+    if (this.player.dead) {
+      this.beginDeath(this.player.deathCause ?? "enemy");
+      return;
+    }
+    if (this.player.y > level.height + tuning.world.fallLimit) {
+      this.player.die("fall");
+      this.beginDeath("fall");
+      return;
+    }
+    this.checkpoints.forEach((cp, i) => {
+      if (cp.active || !boxesOverlap(box, cp.box)) return;
+      cp.activate();
+      this.registry.set("checkpoint", i);
+      this.registry.set("toast", `Checkpoint ${i + 1}`);
+      this.game.events.emit(GAME_EVENTS.checkpoint, { index: i });
+    });
+    const f = level.finish;
+    if (
+      boxesOverlap(box, {
+        x: f.x - f.width / 2,
+        y: f.y - f.height,
+        width: f.width,
+        height: f.height,
+      })
+    ) {
+      this.beginComplete();
+    }
+  }
+
+  private beginDeath(cause: DeathCause): void {
+    this.phase = "dead";
+    const deaths = ((this.registry.get("deaths") as number | undefined) ?? 0) + 1;
+    this.registry.set("deaths", deaths);
+    this.registry.set("runMs", this.runMs);
+    this.game.events.emit(GAME_EVENTS.death, { cause });
+    const delay = cause === "fall" ? 250 : tuning.overlay.deathDelayMs;
+    this.time.delayedCall(delay, () => this.showOverlay({ kind: "dead", cause }));
+  }
+
+  private beginComplete(): void {
+    this.phase = "complete";
+    this.player.locked = true;
+    this.registry.set("runMs", this.runMs);
+    this.game.events.emit(GAME_EVENTS.levelComplete, { ms: Math.round(this.runMs) });
+    this.time.delayedCall(500, () =>
+      this.showOverlay({
+        kind: "complete",
+        timeMs: this.runMs,
+        deaths: (this.registry.get("deaths") as number | undefined) ?? 0,
+      }),
+    );
+  }
+
+  private showOverlay(data: object): void {
+    this.overlayShownAt = this.time.now;
+    this.registry.set("overlay", data);
+  }
+
+  /** R або тап по оверлею: смерть → респавн на чекпоінті; фініш → повний рестарт. */
+  private onOverlayAction(): void {
+    if (
+      this.overlayShownAt === 0 ||
+      this.time.now - this.overlayShownAt < tuning.overlay.inputLockMs
+    )
+      return;
+    if (this.phase === "complete") this.restartRun();
+    else if (this.phase === "dead") this.respawn();
+  }
+
+  private respawn(): void {
+    this.registry.set("runMs", this.runMs);
+    this.scene.restart();
+  }
+
+  private restartRun(): void {
+    this.registry.set("checkpoint", -1);
+    this.registry.set("runMs", 0);
+    this.registry.set("deaths", 0);
+    this.registry.set("runStarted", false);
+    this.scene.restart();
+  }
+
+  /** Автоматичне зниження якості (середній FPS < порогу протягом вікна). */
+  private downgrade(): void {
+    setQuality("low");
+    this.game.events.emit(GAME_EVENTS.qualityDowngrade, { fps: Math.round(this.governor.lastFps) });
+    this.applyQuality();
+  }
+
+  /** Застосовує профіль якості: масштаб рендеру, частинки, тіні, фільтри обгоряння. */
+  private applyQuality(): void {
+    const q = qualityProfile();
+    const rs = renderScale();
+    this.scale.resize(tuning.view.width * rs, tuning.view.height * rs);
+    this.cameras.main.setZoom(rs);
+    for (const f of this.fires) f.applyQuality(q);
+    for (const w of this.winds) w.applyQuality(q);
+    this.playerEmbers.maxAliveParticles = Math.max(
+      1,
+      Math.round(tuning.particles.maxOnPlayer * q.particleScale),
+    );
+    this.shadows.setEnabled(q.shadows);
+    this.overlay.setUseFilters(q.burnFilters);
+    this.game.events.emit(GAME_EVENTS.qualityChanged, getQuality());
+  }
+
+  /** Вогонь: шкода за секунду, обгоряння, іскри на гравці; іскри зон — лише біля камери. */
+  private applyFire(deltaMs: number): void {
+    const b = this.player.body as Phaser.Physics.Arcade.Body;
+    const box = { x: b.x, y: b.y, width: b.width, height: b.height };
+    if (this.phase === "playing") {
+      this.player.inFire = this.fires.some((f) => boxesOverlap(box, f.box));
+      if (this.player.inFire) this.player.applyFire(deltaMs / 1000);
+    } else {
+      this.player.inFire = false;
+    }
+    this.playerEmbers.emitting = this.player.inFire && !this.player.dead;
+    this.player.inWind = this.winds.some((w) => boxesOverlap(box, w.box));
+    this.overlay.sync(this.player, this.player.burn, this.player.frameName);
+
+    // Раз на ~200 мс вирішуємо, яким зонам випускати іскри
+    this.cullTimer -= deltaMs;
+    if (this.cullTimer <= 0) {
+      this.cullTimer = 200;
+      const v = this.cameras.main.worldView;
+      const m = tuning.particles.cullMargin;
+      const near = (r: { x: number; width: number }) =>
+        r.x + r.width > v.x - m && r.x < v.right + m;
+      for (const f of this.fires) f.setNear(near(f.box));
+      for (const w of this.winds) w.setNear(near(w.box));
+    }
+  }
+
+  /** Меч у активній фазі б'є кожного ворога один раз за змах. */
+  private applySwordHits(): void {
+    const box = this.player.swordBox();
+    if (this.hitboxGfx) {
+      this.hitboxGfx.clear();
+      if (box)
+        this.hitboxGfx.lineStyle(2, 0xff2222, 1).strokeRect(box.x, box.y, box.width, box.height);
+    }
+    if (!box) return;
+    for (const e of this.enemies) {
+      if (e.dead || e.lastHitSwing === this.player.attack.swing) continue;
+      const b = e.body as Phaser.Physics.Arcade.Body;
+      if (boxesOverlap(box, { x: b.x, y: b.y, width: b.width, height: b.height })) {
+        e.lastHitSwing = this.player.attack.swing;
+        e.hit(this.player.facing);
+      }
+    }
+  }
+
+  /** HP передаємо HUD через registry, лише коли значення змінилось. */
+  private syncHud(): void {
+    if (this.player.health.hp === this.lastHp) return;
+    this.lastHp = this.player.health.hp;
+    this.registry.set("maxHp", this.player.health.max);
+    this.registry.set("hp", this.lastHp);
+  }
+}

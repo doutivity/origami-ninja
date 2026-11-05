@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head></head>
+  <body>
+    <main id="main" class="container prose">
+      <h1>About Origami Ninja</h1>
+      <p class="lead">A paper ninja runs across a world that is one big sheet of paper. Somebody is slowly folding it, and the only way out is towards the centre.</p>
+      <h2>Story</h2>
+      <p>The ninja is made of paper, and so is everything around them. Fire burns the edges, water soaks the fibres, and the sheet keeps folding. The goal of the full game is to reach the centre of the sheet before the folds close in.</p>
+      <h2>Mechanics</h2>
+      <ul>
+        <li><strong>Run and jump</strong> with variable jump height, coyote time and an input buffer.</li>
+        <li><strong>Sword:</strong> attack on the ground or in the air. Paper enemies patrol between two points and fall after two hits.</li>
+        <li><strong>Fire</strong> takes about 35 HP per second and chars the paper while you stand in it.</li>
+        <li><strong>Glider:</strong> hold jump while falling to fold into a paper plane. Tilt it up or down, and ride rising wind.</li>
+      </ul>
+      <h2>Technology</h2>
+      <p>The game is written in TypeScript with Phaser and Arcade Physics, bundled by Vite. Content pages are plain static HTML with no framework; Phaser loads only on the Play page. All graphics are drawn in code, and the whole project builds and runs in Docker.</p>
+      <h2>Plans</h2>
+      <p>The prototype covers one mountain level. Next come water, more origami transformations, the folding sheet itself and the goal of reaching the centre. Follow progress in the <a href="/devlog/">devlog</a>.</p>
+      <h2 id="open-source">Open source</h2>
+      <p>Origami Ninja is open source under the MIT License. Read the code, report a bug or send an idea in the <a href="https://github.com/doutivity/origami-ninja" rel="noopener">GitHub repository</a>.</p>
+    </main>
+  </body>
+</html>
