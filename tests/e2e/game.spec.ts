@@ -50,26 +50,26 @@ test("the keyboard moves the ninja and Space jumps", async ({ page, isMobile }) 
       ).player;
       return { x: p.x, y: p.y, state: p.machine.name };
     });
-  await page.waitForTimeout(400);
+  // Чекаємо на умови, а не на секунди: на повільному CI ігровий час тече повільніше за стіновий
+  await expect.poll(async () => (await pos()).state, { timeout: 15_000 }).toBe("idle");
   const start = await pos();
   await page.keyboard.down("ArrowRight");
-  await page.waitForTimeout(600);
-  const running = await pos();
+  await expect.poll(async () => (await pos()).x, { timeout: 15_000 }).toBeGreaterThan(start.x + 80);
+  expect((await pos()).state).toBe("run");
   await page.keyboard.up("ArrowRight");
-  expect(running.x).toBeGreaterThan(start.x + 80);
-  expect(running.state).toBe("run");
 
-  await page.waitForTimeout(500);
+  // Спершу гравець зупиняється на землі, потім стрибає
+  await expect.poll(async () => (await pos()).state, { timeout: 15_000 }).toBe("idle");
   const ground = await pos();
   await page.keyboard.down("Space");
-  await page.waitForTimeout(250);
-  const air = await pos();
+  await expect.poll(async () => (await pos()).y, { timeout: 15_000 }).toBeLessThan(ground.y - 20);
   await page.keyboard.up("Space");
-  expect(air.y).toBeLessThan(ground.y - 20);
 });
 
 test("fire hurts, a death overlay appears and R respawns", async ({ page, isMobile }) => {
   test.skip(isMobile, "keyboard flow is covered on desktop");
+  // Вогонь вбиває за ≈3 с ігрового часу; на повільному CI це може тривати помітно довше
+  test.setTimeout(120_000);
   await page.goto("play/?debug=1");
   await waitForGame(page);
   await page.evaluate(() => {
@@ -86,23 +86,29 @@ test("fire hurts, a death overlay appears and R respawns", async ({ page, isMobi
         }
       ).registry.get("overlay") !== null,
     undefined,
-    { timeout: 8000 },
+    { timeout: 60_000 },
   );
-  await page.waitForTimeout(600);
-  await page.keyboard.down("r");
-  await page.waitForTimeout(80);
-  await page.keyboard.up("r");
-  await page.waitForFunction(
-    () => {
+  // Оверлей кілька сотень мс ігнорує вхід (захист від випадкового пропуску), тож натискаємо R,
+  // поки гра не відродиться: на повільному CI «кілька сотень мс» ігрового часу можуть бути секундами
+  const respawned = () =>
+    page.evaluate(() => {
       const g = window.__origami.scene.getScene("GameScene") as unknown as {
         registry: { get(k: string): unknown };
         player?: { health: { hp: number } };
       };
       return g.registry.get("overlay") === null && g.player?.health.hp === 100;
-    },
-    undefined,
-    { timeout: 8000 },
-  );
+    });
+  await expect
+    .poll(
+      async () => {
+        await page.keyboard.down("r");
+        await page.waitForTimeout(80);
+        await page.keyboard.up("r");
+        return respawned();
+      },
+      { timeout: 60_000, intervals: [300] },
+    )
+    .toBe(true);
 });
 
 test.describe("mobile", () => {

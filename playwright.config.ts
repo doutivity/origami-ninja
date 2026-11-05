@@ -7,7 +7,9 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
-  workers: 2,
+  // На CI лише один процес: гра на програмному WebGL і так вантажить 2-ядерний раннер,
+  // а паралельні сторінки сповільнюють ігровий час і роблять тести нестабільними
+  workers: process.env.CI ? 1 : 2,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { outputFolder: "playwright-report/html", open: "never" }]],
   outputDir: "test-results/artifacts",

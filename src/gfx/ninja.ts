@@ -65,7 +65,7 @@ export interface PuppetParams {
   lean: number;
   backHand: readonly [number, number];
   frontHand: readonly [number, number];
-  tails: "idle" | "run";
+  tails: "idle" | "run" | "wave";
   /** Поворот меча навколо плеча (градуси); 0 — меч за спиною */
   swordAngle?: number;
 }
@@ -82,6 +82,15 @@ export const PUPPET_POSES = {
     frontHand: HANDS_REST,
     tails: "idle",
   },
+  /** Другий кадр idle: легке «дихання» й інші хвости пов'язки */
+  idle2: {
+    backLeg: -15,
+    frontLeg: 4,
+    lean: -1.5,
+    backHand: [0, 5],
+    frontHand: [0, 5],
+    tails: "wave",
+  },
   run0: {
     backLeg: 28,
     frontLeg: -38,
@@ -96,7 +105,7 @@ export const PUPPET_POSES = {
     lean: 8,
     backHand: [-12, -22],
     frontHand: [14, -32],
-    tails: "run",
+    tails: "wave",
   },
   run2: {
     backLeg: -38,
@@ -112,7 +121,7 @@ export const PUPPET_POSES = {
     lean: 8,
     backHand: [12, -30],
     frontHand: [-12, -22],
-    tails: "run",
+    tails: "wave",
   },
   jump: {
     backLeg: -55,
@@ -130,6 +139,24 @@ export const PUPPET_POSES = {
     frontHand: [70, -40],
     tails: "run",
     swordAngle: 62,
+  },
+  /** Проміжний кадр між стоячим і планером: ноги підтягнуті, тулуб подається вперед */
+  fold: {
+    backLeg: -88,
+    frontLeg: -98,
+    lean: 30,
+    backHand: [34, -16],
+    frontHand: [74, -6],
+    tails: "run",
+  },
+  /** Приголомшення після удару: відкинутий назад, руки вгору */
+  hurt: {
+    backLeg: 16,
+    frontLeg: -20,
+    lean: -20,
+    backHand: [-30, -120],
+    frontHand: [36, -118],
+    tails: "run",
   },
   fall: {
     backLeg: 22,
@@ -158,6 +185,9 @@ export function puppetFigure(p: Palette, q: PuppetParams): string {
   const tailsIdle =
     f("505,140 430,152 372,142 400,172 450,186 512,165", p.accent) +
     f("510,152 440,205 400,250 460,232 520,172", p.accent);
+  const tailsWave =
+    f("505,140 420,128 352,150 396,166 452,168 512,165", p.accent) +
+    f("510,150 432,196 366,184 414,228 484,204 520,172", p.accent);
   const bodyPieces = [
     f("548,260 620,292 578,362 560,320"),
     f("458,275 548,260 562,332 555,335"),
@@ -176,7 +206,7 @@ export function puppetFigure(p: Palette, q: PuppetParams): string {
   const handBack = f("395,625 425,650 402,690 362,655");
   const handFront = f("738,490 752,565 676,552") + f("688,562 750,567 716,598");
   const sword =
-    f("470,330 715,38 745,62 500,362", p.muted, `stroke="${ink}" stroke-width="5"`) +
+    f("470,330 728,22 762,52 500,362", p.paper, `stroke="${ink}" stroke-width="9"`) +
     f("455,320 505,355 480,385 435,350", p.accent);
 
   const rot = (deg: number, x: number, y: number, inner: string) =>
@@ -187,7 +217,7 @@ export function puppetFigure(p: Palette, q: PuppetParams): string {
     rot(q.swordAngle ?? 0, 480, 345, sword) +
     bodyPieces +
     head +
-    (q.tails === "run" ? tailsRun : tailsIdle);
+    (q.tails === "run" ? tailsRun : q.tails === "wave" ? tailsWave : tailsIdle);
   const figure =
     rot(q.backLeg, 500, 742, backLeg) +
     rot(q.frontLeg, 620, 712, frontLeg) +
