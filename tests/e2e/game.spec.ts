@@ -183,6 +183,7 @@ test("Burning Pagoda: the frog leap reaches a high ledge and the fire wall climb
     scene: { restart(): void };
     registry: { set(k: string, v: unknown): void };
     rise?: { topY: number };
+    riseMs: number;
     player?: {
       x: number;
       y: number;
@@ -236,12 +237,35 @@ test("Burning Pagoda: the frog leap reaches a high ledge and the fire wall climb
     )
     .toBe(true);
 
+  // На повільному CI стіна вогню встигає дійти до ніндзя, поки тест чекає: стіна рахується від
+  // респавну, тож скидаємо її таймер після телепорту (далі перевіряємо, що вона все одно лізе вгору)
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.riseMs = 0;
+  });
+
   // Заряджаємо стрибок до максимуму, далі стрибаємо вліво на карниз 220 px вище (звичайний стрибок — лише ~136)
   await page.keyboard.down("Space");
   await expect
     .poll(async () => (await snap())?.charge ?? 0, { timeout: 30_000, intervals: [100] })
     .toBeGreaterThan(0.95);
   await page.screenshot({ path: "test-results/pagoda-charge.png" });
+  // Стрибок приземляє ніндзя біля лівого краю карниза (400…660), тож утримання ← до кінця
+  // скидає його вниз, якщо тест запізнюється. Відпускаємо ← у самій грі, щойно ніндзя проминув x=600:
+  // решта інерції лишає його на карнизі незалежно від частоти кадрів.
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene & {
+      events: { on(e: string, fn: () => void): void };
+    };
+    let released = false;
+    g.events.on("update", () => {
+      if (released || !g.player || g.player.x >= 600) return;
+      released = true;
+      window.dispatchEvent(
+        new KeyboardEvent("keyup", { code: "ArrowLeft", key: "ArrowLeft", keyCode: 37 }),
+      );
+    });
+  });
   await page.keyboard.down("ArrowLeft");
   await page.keyboard.up("Space");
   await expect
