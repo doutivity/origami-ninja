@@ -308,3 +308,75 @@ export function pagodaBackdrop(p: Palette, w: number, h: number): string {
   });
   return parts.join("");
 }
+
+/** Паперовий журавлик у квадраті 48×32; frame 0 — крила вгору, 1 — крила вниз. */
+export function crane(p: Palette, frame: 0 | 1): string {
+  const wing =
+    frame === 0
+      ? [poly("22,16 14,2 30,12", p.paper), poly("22,16 30,12 34,4", p.shade)]
+      : [poly("22,16 12,28 30,20", p.paper), poly("22,16 30,20 36,28", p.shade)];
+  return `<g stroke="${p.ink}" stroke-width="0.8" stroke-linejoin="round">${[
+    poly("8,14 22,16 30,20 22,22", p.paper),
+    ...wing,
+    poly("30,20 40,16 38,19", p.paper),
+    poly("38,16 44,18 38,19", p.accent),
+    poly("8,14 2,12 8,16", p.paper),
+    `<circle cx="39" cy="17" r="0.9" fill="${p.ink}"/>`,
+  ].join("")}</g>`;
+}
+
+/** Флюгер на стовпі 40×110: закритий — сірий і нерухомий, відкритий — акцентний. Основа внизу. */
+export function weathervane(p: Palette, open: boolean): string {
+  const head = open ? p.accent : p.shade;
+  return [
+    `<rect x="18" y="26" width="4" height="82" fill="${p.ink}"/>`,
+    poly("8,108 32,108 26,98 14,98", p.ink),
+    `<circle cx="20" cy="24" r="4" fill="${p.ink}"/>`,
+    poly("20,10 38,22 20,34", head, `stroke="${p.ink}" stroke-width="1.2" stroke-linejoin="round"`),
+    poly(
+      "20,10 2,22 20,34",
+      open ? p.fire : p.muted,
+      `fill-opacity="0.7" stroke="${p.ink}" stroke-width="1.2"`,
+    ),
+  ].join("");
+}
+
+/** Нічний каньйон: далекі скелі, місяць із ореолом, зірки й паперові смуги хмар. */
+export function canyonBackdrop(p: Palette, w: number, h: number): string {
+  const parts: string[] = [];
+  // Зірки з детермінованим розкидом (без Math.random: збірка відтворювана)
+  for (let i = 0; i < 46; i++) {
+    const x = (i * 211) % w;
+    const y = 14 + ((i * 97) % 230);
+    const r = 1 + (i % 3) * 0.6;
+    parts.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${p.paper}" fill-opacity="0.75"/>`);
+  }
+  // Місяць
+  parts.push(
+    `<circle cx="${w * 0.72}" cy="120" r="64" fill="${p.paper}" fill-opacity="0.16"/>`,
+    `<circle cx="${w * 0.72}" cy="120" r="42" fill="${p.paper}" fill-opacity="0.9"/>`,
+  );
+  // Смуги хмар
+  for (let i = 0; i < 6; i++) {
+    const x = ((i * 337) % w) - 60;
+    const y = 90 + ((i * 71) % 210);
+    parts.push(
+      `<rect x="${x}" y="${y}" width="${180 + (i % 3) * 60}" height="8" rx="4" fill="${p.muted}" fill-opacity="0.25"/>`,
+    );
+  }
+  // Два шари стін каньйону: зубчасті силуети
+  const ridge = (base: number, step: number, amp: number, seed: number) => {
+    const pts = [`0,${h}`];
+    for (let x = 0; x <= w; x += step) {
+      const k = (Math.floor(x / step) * seed) % 7;
+      pts.push(`${x},${base - (k / 6) * amp}`);
+    }
+    pts.push(`${w},${h}`);
+    return pts.join(" ");
+  };
+  parts.push(
+    poly(ridge(380, 120, 150, 3), p.shade),
+    poly(ridge(450, 90, 110, 5), p.ink, 'fill-opacity="0.55"'),
+  );
+  return parts.join("");
+}

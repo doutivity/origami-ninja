@@ -52,6 +52,23 @@ export function validateLevel(level: LevelDef): string[] {
     if (w.width <= 0 || w.height <= 0) err(`wind ${i}: non-positive size`);
     if (!inWorld(w.x, w.y)) err(`wind ${i}: outside the world`);
   });
+  const vaneIds = new Set((level.vanes ?? []).map((v) => v.id));
+  level.winds.forEach((w, i) => {
+    if (w.dir && w.dir.x === 0 && w.dir.y === 0) err(`wind ${i}: zero direction`);
+    if (w.gate !== undefined && !vaneIds.has(w.gate))
+      err(`wind ${i}: gate "${w.gate}" has no weathervane`);
+  });
+  level.vanes?.forEach((v, i) => {
+    if (!under(level.platforms, v.x, v.y)) err(`vane ${i}: not standing on a platform`);
+    if (!level.winds.some((w) => w.gate === v.id)) err(`vane ${i}: opens nothing`);
+    if ((level.vanes ?? []).findIndex((o) => o.id === v.id) !== i)
+      err(`vane ${i}: duplicate id "${v.id}"`);
+  });
+  level.cranes?.forEach((c, i) => {
+    if (c.range <= 0) err(`crane ${i}: non-positive range`);
+    if (!inWorld(c.x - c.range, c.y) || !inWorld(c.x + c.range, c.y))
+      err(`crane ${i}: outside the world`);
+  });
   level.waters?.forEach((w, i) => {
     if (w.width <= 0 || w.height <= 0) err(`water ${i}: non-positive size`);
     if (!inWorld(w.x, w.y)) err(`water ${i}: outside the world`);

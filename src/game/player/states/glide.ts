@@ -13,7 +13,15 @@ export class GlideState implements PlayerState {
     // Напрям польоту: ←/→ розвертають літачок, інакше летимо в напрямку погляду
     const dir = axisX(ctx.input);
     if (dir !== 0) ctx.facing = dir;
-    const next = glideStep(ctx.vx, ctx.vy, ctx.facing, tiltOf(ctx.input), ctx.inWind, ctx.dt);
+    const next = glideStep(
+      ctx.vx,
+      ctx.vy,
+      ctx.facing,
+      tiltOf(ctx.input),
+      ctx.inWind,
+      ctx.dt,
+      ctx.wind,
+    );
     ctx.vx = next.vx;
     ctx.vy = next.vy;
     return null;

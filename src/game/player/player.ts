@@ -9,7 +9,7 @@ import { tuning } from "../tuning.ts";
 import { stepBoat } from "../water/boat-motion.ts";
 import type { PlayerContext, StateName } from "./context.ts";
 import { chargeFraction } from "./frog-model.ts";
-import { tiltOf } from "./glide-model.ts";
+import { tiltOf, type WindEffect } from "./glide-model.ts";
 import { StateMachine } from "./state-machine.ts";
 import { ChargeState } from "./states/charge.ts";
 import { DeadState } from "./states/dead.ts";
@@ -59,6 +59,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private leaping = false;
   /** Чи в зоні висхідного вітру (виставляє GameScene) */
   inWind = false;
+  /** Який вітер діє зараз (виставляє сцена разом з inWind) */
+  wind: WindEffect | null = null;
   private runClock = 0;
   private idleClock = 0;
   private foldMs = 0;
@@ -209,6 +211,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.prevJumpHeld = held;
     this.waterExitMs = Math.max(0, this.waterExitMs - deltaMs);
     ctx.inWind = this.inWind;
+    ctx.wind = this.inWind ? this.wind : null;
     ctx.onGround = body.blocked.down || body.touching.down;
     ctx.vx = body.velocity.x;
     ctx.vy = body.velocity.y;
