@@ -18,6 +18,7 @@ describe("puppet poses", () => {
       "attack",
       "fold",
       "hurt",
+      "land",
     ]) {
       expect(names).toContain(n);
     }

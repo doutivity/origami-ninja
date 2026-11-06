@@ -46,6 +46,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private runClock = 0;
   private idleClock = 0;
   private foldMs = 0;
+  private landMs = 0;
   private prevState: StateName = "fall";
 
   constructor(scene: Phaser.Scene, x: number, feetY: number) {
@@ -192,6 +193,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (state !== this.prevState && (state === "glide" || this.prevState === "glide")) {
       this.foldMs = tuning.player.foldMs;
     }
+    // Амортизація приземлення після польоту або падіння
+    if (
+      (this.prevState === "fall" || this.prevState === "glide") &&
+      (state === "idle" || state === "run")
+    ) {
+      this.landMs = tuning.player.landMs;
+    }
     this.prevState = state;
     if (this.foldMs > 0) {
       this.foldMs -= ctx.dt * 1000;
@@ -199,6 +207,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
     if (state === "glide") return "glide";
     if (this.attack.busy) return "attack";
+    if (this.landMs > 0) {
+      this.landMs -= ctx.dt * 1000;
+      if (state === "idle" || state === "run") return "land";
+    }
     switch (state) {
       case "run":
         this.runClock += Math.abs(ctx.vx) * ctx.dt * tuning.player.runFramesPerPixel;
