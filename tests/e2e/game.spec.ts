@@ -453,6 +453,82 @@ test("Ink Marsh: holding Attack folds into a shell that survives one hit", async
   expect(errors).toEqual([]);
 });
 
+test("Kirigami Workshop: a double-tap on Attack dashes through a tough paper wall", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "keyboard flow is covered on desktop");
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+  await page.goto("play/?debug=1");
+  await waitForGame(page);
+
+  type Scene = {
+    scene: { restart(): void };
+    registry: { set(k: string, v: unknown): void };
+    cuts: { tough: boolean; cut: boolean }[];
+    player?: {
+      x: number;
+      y: number;
+      body: { blocked: { down: boolean } };
+      setPosition(x: number, y: number): void;
+    };
+  };
+  const snap = () =>
+    page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      const p = g.player;
+      return p
+        ? {
+            x: p.x,
+            grounded: p.body.blocked.down,
+            tough: g.cuts.filter((c) => c.tough).map((c) => c.cut),
+          }
+        : null;
+    });
+
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.registry.set("levelId", "kirigami-workshop");
+    g.registry.set("checkpoint", -1);
+    g.scene.restart();
+  });
+  await expect
+    .poll(async () => (await snap())?.tough.length ?? 0, { timeout: 30_000 })
+    .toBeGreaterThan(0);
+  expect((await snap())?.tough).toEqual([false, false]);
+  await page.screenshot({ path: "test-results/workshop-start.png" });
+
+  // Ставимо ніндзя за 60 px до товстої стіни (x=1620) і двічі тапаємо Attack
+  const standBeforeWall = async () => {
+    await page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      g.player?.setPosition(1560, 440 - 40);
+    });
+  };
+  await expect
+    .poll(
+      async () => {
+        const s = await snap();
+        if (s && !(s.grounded && s.x > 1500 && s.x < 1600)) await standBeforeWall();
+        return !!s && s.grounded && s.x > 1500 && s.x < 1600;
+      },
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toBe(true);
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.down("KeyJ");
+    await page.waitForTimeout(60);
+    await page.keyboard.up("KeyJ");
+    await page.waitForTimeout(60);
+  }
+  await expect
+    .poll(async () => (await snap())?.tough, { timeout: 15_000, intervals: [100] })
+    .toEqual([true, false]);
+  await page.screenshot({ path: "test-results/workshop-dash.png" });
+  expect(errors).toEqual([]);
+});
+
 test.describe("mobile", () => {
   test.skip(({ isMobile }) => !isMobile, "touch controls need a phone profile");
 

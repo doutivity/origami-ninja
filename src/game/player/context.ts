@@ -10,6 +10,7 @@ export type StateName =
   | "glide"
   | "charge"
   | "shell"
+  | "dash"
   | "hurt"
   | "dead";
 
@@ -34,6 +35,8 @@ export interface PlayerContext {
   wind?: WindEffect | null;
   /** Напрямок погляду: -1 ліворуч, 1 праворуч */
   facing: -1 | 1;
+  /** Планер вимкнено на рівні */
+  glideDisabled?: boolean;
   /** Гравець стоїть у чорнилі (сповільнює біг і стрибок, крім форми панцира) */
   inInk?: boolean;
   /** Утримання Attack достатнє, щоб скластись у панцир (рахує Player) */

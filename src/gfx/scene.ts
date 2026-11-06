@@ -341,6 +341,74 @@ export function weathervane(p: Palette, open: boolean): string {
   ].join("");
 }
 
+/** Паперова стіна w×h для кірігамі-майстерні: вирізні щілини; товста — з акцентним хрестом-розпіркою. */
+export function cutPanel(p: Palette, w: number, h: number, tough: boolean): string {
+  const parts: string[] = [
+    `<rect x="1" y="1" width="${w - 2}" height="${h - 2}" fill="${p.paper}" stroke="${p.ink}" stroke-width="${tough ? 3 : 1.6}"/>`,
+  ];
+  // Кірігамі-щілини: короткі косі прорізи рядами
+  for (let y = 14; y < h - 10; y += 22) {
+    const x = ((y / 22) % 2) * 6 + 5;
+    parts.push(
+      `<path d="M${x},${y} L${w - x},${y + 8}" stroke="${p.muted}" stroke-width="1.4" stroke-opacity="0.7" fill="none" stroke-linecap="round"/>`,
+    );
+  }
+  if (tough) {
+    parts.push(
+      `<path d="M2,2 L${w - 2},${h - 2} M${w - 2},2 L2,${h - 2}" stroke="${p.accent}" stroke-width="3" fill="none"/>`,
+      `<rect x="1" y="${h / 2 - 6}" width="${w - 2}" height="12" fill="${p.accent}" fill-opacity="0.8"/>`,
+    );
+  }
+  return parts.join("");
+}
+
+/** Кірігамі-майстерня: розкрійний мат, ножиці на стіні, паперові гірлянди. */
+export function workshopBackdrop(p: Palette, w: number, h: number): string {
+  const parts: string[] = [];
+  // Розкрійна сітка
+  for (let x = 0; x < w; x += 64) {
+    parts.push(
+      `<rect x="${x}" y="0" width="1.5" height="${h}" fill="${p.muted}" fill-opacity="0.14"/>`,
+    );
+  }
+  for (let y = 40; y < h; y += 64) {
+    parts.push(
+      `<rect x="0" y="${y}" width="${w}" height="1.5" fill="${p.muted}" fill-opacity="0.14"/>`,
+    );
+  }
+  // Полиці з рулонами паперу
+  for (let i = 0; i < 4; i++) {
+    const x = 120 + i * 440;
+    const y = 250 + ((i * 41) % 60);
+    parts.push(
+      `<rect x="${x}" y="${y}" width="260" height="10" fill="${p.ink}" fill-opacity="0.35"/>`,
+      `<rect x="${x + 20}" y="${y - 54}" width="40" height="54" fill="${p.shade}"/>`,
+      `<rect x="${x + 76}" y="${y - 40}" width="34" height="40" fill="${p.muted}" fill-opacity="0.5"/>`,
+      `<rect x="${x + 128}" y="${y - 62}" width="46" height="62" fill="${p.shade}"/>`,
+      poly(`${x + 196},${y} ${x + 214},${y - 44} ${x + 232},${y}`, p.accent, 'fill-opacity="0.45"'),
+    );
+  }
+  // Ножиці на стіні
+  for (const sx of [300, 980, 1500]) {
+    parts.push(
+      `<g stroke="${p.ink}" stroke-opacity="0.4" stroke-width="5" stroke-linecap="round" fill="none">`,
+      `<line x1="${sx}" y1="120" x2="${sx + 60}" y2="40"/><line x1="${sx + 60}" y1="120" x2="${sx}" y2="40"/>`,
+      `<circle cx="${sx}" cy="130" r="9"/><circle cx="${sx + 60}" cy="130" r="9"/></g>`,
+    );
+  }
+  // Паперова гірлянда з трикутників
+  for (let x = 0; x < w; x += 70) {
+    parts.push(
+      poly(
+        `${x},0 ${x + 70},0 ${x + 35},${26 + ((x / 70) % 3) * 8}`,
+        p.accent,
+        'fill-opacity="0.22"',
+      ),
+    );
+  }
+  return parts.join("");
+}
+
 /** Чорнильна заплава: розмиті гори тушшю, очерет і чорнильні краплі, що стікають із неба. */
 export function marshBackdrop(p: Palette, w: number, h: number): string {
   const parts: string[] = [];

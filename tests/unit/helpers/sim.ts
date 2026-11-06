@@ -5,8 +5,10 @@ import { inkBox } from "../../../src/game/ink/ink-model.ts";
 import { emptyInput, type InputState } from "../../../src/game/input/input-state.ts";
 import type { LevelDef } from "../../../src/game/level/types.ts";
 import type { PlayerContext } from "../../../src/game/player/context.ts";
+import { DashController } from "../../../src/game/player/dash-model.ts";
 import { ringDirection } from "../../../src/game/player/glide-model.ts";
 import { StateMachine } from "../../../src/game/player/state-machine.ts";
+import { DashState } from "../../../src/game/player/states/dash.ts";
 import { DeadState } from "../../../src/game/player/states/dead.ts";
 import { FallState } from "../../../src/game/player/states/fall.ts";
 import { GlideState } from "../../../src/game/player/states/glide.ts";
@@ -29,6 +31,10 @@ export interface SimInput {
   up?: (s: SimState) => boolean;
   down?: (s: SimState) => boolean;
   right?: boolean;
+  /** Кадр, на якому гравець двічі тапає Attack (ривок); викликається, доки не спрацює */
+  dashAt?: (s: SimState) => boolean;
+  /** Меч розрізає звичайні (не товсті) стіни, щойно гравець підходить упритул */
+  swordCuts?: boolean;
   /** Вважати відкритими всі вітрові тунелі з gate (флюгери вже вдарено) */
   openGates?: boolean;
 }
@@ -75,6 +81,7 @@ export function simulate(
       new JumpState(),
       new FallState(),
       new GlideState(),
+      new DashState(),
       new HurtState(),
       new DeadState(),
     ],
@@ -90,6 +97,7 @@ export function simulate(
     jumpBufferMs: Number.POSITIVE_INFINITY,
     inWind: false,
     facing: 1,
+    glideDisabled: level.noGlide === true,
   };
   let x = startX;
   let feet = startFeet;
@@ -98,12 +106,17 @@ export function simulate(
   const trace: SimState[] = [];
   let apex = feet;
 
-  const solids = level.platforms.map((p) => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
+  const solids: { x: number; y: number; w: number; h: number; panel?: { tough: boolean } }[] =
+    level.platforms.map((p) => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
+  for (const c of level.cuts ?? [])
+    solids.push({ x: c.x, y: c.y, w: c.width, h: c.height, panel: { tough: c.tough === true } });
+  const dasher = new DashController();
+  let dashed = false;
   const dims = () => (machine.name === "glide" ? glide : stand);
 
   for (let frame = 0; frame < maxFrames; frame++) {
     const d = dims();
-    const gravity = machine.name === "glide" ? 0 : tuning.player.gravity;
+    const gravity = machine.name === "glide" || machine.name === "dash" ? 0 : tuning.player.gravity;
     // 1. Фізика: гравітація, переміщення по осях і зіткнення
     ctx.vy += gravity * DT;
     ctx.vy = Math.min(ctx.vy, 2000);
@@ -176,7 +189,30 @@ export function simulate(
     });
     ctx.coyoteMs = onGround ? 0 : ctx.coyoteMs + DT * 1000;
     ctx.jumpBufferMs = pressNow ? 0 : ctx.jumpBufferMs + DT * 1000;
-    machine.update(ctx);
+    // Ривок: подвійний тап Attack, як у грі; ривок і меч розрізають панелі
+    dasher.update(DT * 1000, onGround);
+    if (input.dashAt && !dashed && input.dashAt(snap)) {
+      dashed = true;
+      dasher.press(onGround);
+      if (dasher.press(onGround)) machine.transition("dash", ctx);
+    } else {
+      machine.update(ctx);
+    }
+    const reach = tuning.dash.cutReach;
+    const sweep = {
+      x: machine.name === "dash" ? x - d.w / 2 : x + d.w / 2 - 8,
+      y: feet - d.h,
+      w: machine.name === "dash" ? d.w + reach : 70,
+      h: d.h,
+    };
+    for (let i = solids.length - 1; i >= 0; i--) {
+      const panel = solids[i]?.panel;
+      if (!panel) continue;
+      const hit = overlap(sweep, solids[i] as (typeof solids)[number]);
+      const byDash = machine.name === "dash" && hit;
+      const bySword = input.swordCuts === true && !panel.tough && hit;
+      if (byDash || bySword) solids.splice(i, 1);
+    }
 
     if (feet > level.height + tuning.world.fallLimit) {
       return { landed: false, fell: true, final: snap, apex, frames: frame, trace };

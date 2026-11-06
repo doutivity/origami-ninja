@@ -69,6 +69,16 @@ export interface InkDef {
   width: number;
 }
 
+/** Паперова стіна, яку можна розрізати. y — верх; низ (y + height) має лежати на платформі. */
+export interface CutDef {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** «Товста» стіна: меч її не бере, лише ривок */
+  tough?: boolean;
+}
+
 /** Водна зона: x, y — лівий верхній кут поверхні води. */
 export interface WaterDef {
   x: number;
@@ -121,9 +131,13 @@ export interface LevelDef {
   id: string;
   name: string;
   /** Текстура фону (за замовчуванням "mountains") */
-  bg?: "mountains" | "bamboo" | "pagoda" | "canyon" | "marsh";
+  bg?: "mountains" | "bamboo" | "pagoda" | "canyon" | "marsh" | "workshop";
   /** Вертикальний рівень: ціль угорі, перевірка досяжності замість прірви для планера */
   vertical?: boolean;
+  /** Планер вимкнено (закрите приміщення: утримання Jump у падінні нічого не складає) */
+  noGlide?: boolean;
+  /** Чи доступний ривок-сюрікен (подвійний тап Attack) */
+  dash?: boolean;
   /** Чи доступна форма черепахи (панцир при утриманні Attack) */
   shell?: boolean;
   /** Чи доступна форма жабки (заряджений стрибок) */
@@ -143,6 +157,7 @@ export interface LevelDef {
   archers?: ArcherDef[];
   cranes?: CraneDef[];
   inks?: InkDef[];
+  cuts?: CutDef[];
   vanes?: VaneDef[];
   beams?: BeamDef[];
   rise?: RiseDef;

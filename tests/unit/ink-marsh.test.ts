@@ -32,7 +32,7 @@ describe("ink marsh level", () => {
     expect(validateLevel(inkMarsh)).toEqual([]);
     expect(LEVELS).toContain(inkMarsh);
     expect(nextLevel("midnight-canyon")).toBe(inkMarsh);
-    expect(nextLevel("ink-marsh")).toBeNull();
+    expect(nextLevel("ink-marsh")?.id).toBe("kirigami-workshop");
   });
 
   it("has ink, the shell form, archers and enemies", () => {

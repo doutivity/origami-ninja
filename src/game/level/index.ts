@@ -1,6 +1,7 @@
 import { bambooRiver } from "./bamboo-river.ts";
 import { burningPagoda } from "./burning-pagoda.ts";
 import { inkMarsh } from "./ink-marsh.ts";
+import { kirigamiWorkshop } from "./kirigami-workshop.ts";
 import { midnightCanyon } from "./midnight-canyon.ts";
 import { mountain } from "./mountain.ts";
 import type { LevelDef } from "./types.ts";
@@ -12,6 +13,7 @@ export const LEVELS: readonly LevelDef[] = [
   burningPagoda,
   midnightCanyon,
   inkMarsh,
+  kirigamiWorkshop,
 ];
 
 export function getLevel(idOrIndex: string | number): LevelDef {

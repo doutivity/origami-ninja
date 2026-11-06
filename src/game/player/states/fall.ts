@@ -22,7 +22,7 @@ export class FallState implements PlayerState {
     }
     if (ctx.onGround) return axisX(ctx.input) === 0 ? "idle" : "run";
     // Утримання Jump під час падіння складає ніндзя в літачок
-    if (ctx.input.jumpHeld && ctx.vy >= tuning.glide.minFallSpeed) {
+    if (!ctx.glideDisabled && ctx.input.jumpHeld && ctx.vy >= tuning.glide.minFallSpeed) {
       this.heldMs += ctx.dt * 1000;
       if (this.heldMs >= tuning.glide.holdMs) return "glide";
     } else {

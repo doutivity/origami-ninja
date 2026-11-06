@@ -9,6 +9,7 @@ import {
   type PuppetPoseName,
   puppetFigure,
   shell,
+  shuriken,
 } from "../../gfx/ninja.ts";
 import {
   archer,
@@ -18,6 +19,7 @@ import {
   canyonBackdrop,
   checkpointFlag,
   crane,
+  cutPanel,
   finishGate,
   fireArrow,
   flameCluster,
@@ -28,6 +30,7 @@ import {
   slash,
   waterSurface,
   weathervane,
+  workshopBackdrop,
 } from "../../gfx/scene.ts";
 import { burnedPolygon, emberPolygon } from "../combat/burn.ts";
 import { currentPalette, renderScale } from "../env.ts";
@@ -36,7 +39,7 @@ import { rasterize, svgDoc } from "../rasterize.ts";
 import { tuning } from "../tuning.ts";
 
 /** Кадри гравця: пози ляльки, складений у літачок планер та орігамі-човник. */
-export type FrameName = PuppetPoseName | "glide" | "boat" | "frog" | "frogLeap" | "shell";
+export type FrameName = PuppetPoseName | "glide" | "boat" | "frog" | "frogLeap" | "shell" | "dash";
 
 export const TEX = {
   ninja: (name: FrameName) => `ninja-${name}`,
@@ -45,6 +48,8 @@ export const TEX = {
   bgPagoda: "bg-pagoda",
   bgCanyon: "bg-canyon",
   bgMarsh: "bg-marsh",
+  bgWorkshop: "bg-workshop",
+  cut: (levelId: string, i: number) => `cut-${levelId}-${i}`,
   crane: (frame: number) => `crane-${frame}`,
   vane: (open: boolean) => (open ? "vane-open" : "vane-closed"),
   ring: "ring",
@@ -152,6 +157,15 @@ export class BootScene extends Phaser.Scene {
         frames.set("shell", img);
       }),
     );
+    // Сюрікен: ніндзя, скручений у зірку (центр зірки збігається з центром тіла)
+    jobs.push(
+      rasterize(
+        svgDoc(128, 128, "0 0 64 64", `<g transform="translate(0 6)">${shuriken(p)}</g>`),
+      ).then((img) => {
+        this.textures.addImage(TEX.ninja("dash"), img);
+        frames.set("dash", img);
+      }),
+    );
     // Чекпоінти, фінішні ворота й тінь-пляма
     add(TEX.checkpoint(false), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, false)));
     add(TEX.checkpoint(true), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, true)));
@@ -222,7 +236,23 @@ export class BootScene extends Phaser.Scene {
     add(TEX.bgPagoda, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, pagodaBackdrop(p, bgW, bgH)));
     add(TEX.bgCanyon, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, canyonBackdrop(p, bgW, bgH)));
     add(TEX.bgMarsh, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, marshBackdrop(p, bgW, bgH)));
+    add(TEX.bgWorkshop, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, workshopBackdrop(p, bgW, bgH)));
     add(TEX.bgBamboo, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, bambooForest(p, bgW, bgH, 50)));
+
+    // Паперові стіни кірігамі-рівнів
+    LEVELS.forEach((lvl) => {
+      lvl.cuts?.forEach((c, i) => {
+        add(
+          TEX.cut(lvl.id, i),
+          svgDoc(
+            Math.round(c.width * rs),
+            Math.round(c.height * rs),
+            `0 0 ${c.width} ${c.height}`,
+            cutPanel(p, c.width, c.height, c.tough === true),
+          ),
+        );
+      });
+    });
 
     // Платформи для всіх рівнів
     LEVELS.forEach((lvl) => {

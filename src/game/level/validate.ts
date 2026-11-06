@@ -71,6 +71,12 @@ export function validateLevel(level: LevelDef): string[] {
     );
     if (!lies) err(`ink ${i}: not lying on one platform`);
   });
+  level.cuts?.forEach((c, i) => {
+    if (c.width <= 0 || c.height <= 0) err(`cut ${i}: non-positive size`);
+    if (!under(level.platforms, c.x + c.width / 2, c.y + c.height))
+      err(`cut ${i}: not standing on a platform`);
+    if (c.tough && !level.dash) err(`cut ${i}: tough wall on a level without the dash`);
+  });
   level.cranes?.forEach((c, i) => {
     if (c.range <= 0) err(`crane ${i}: non-positive range`);
     if (!inWorld(c.x - c.range, c.y) || !inWorld(c.x + c.range, c.y))

@@ -15,6 +15,7 @@ import { InputHub } from "../input/hub.ts";
 import { getLevel, nextLevel } from "../level/index.ts";
 import type { LevelDef } from "../level/types.ts";
 import { Checkpoint } from "../objects/checkpoint.ts";
+import { CutPanel } from "../objects/cut-panel.ts";
 import { Shadows } from "../objects/shadows.ts";
 import { Vane } from "../objects/vane.ts";
 import { Player } from "../player/player.ts";
@@ -44,6 +45,7 @@ export class GameScene extends Phaser.Scene {
   private beams: Beam[] = [];
   private vanes: Vane[] = [];
   private inks: InkZone[] = [];
+  private cuts: CutPanel[] = [];
   /** Літаючі вороги не мають колізій із платформами й тіней */
   private fliers: Enemy[] = [];
   private arrows!: ArrowPool;
@@ -87,6 +89,7 @@ export class GameScene extends Phaser.Scene {
     this.beams = [];
     this.vanes = [];
     this.inks = [];
+    this.cuts = [];
     this.fliers = [];
     this.rise = undefined;
     this.riseMs = 0;
@@ -108,6 +111,7 @@ export class GameScene extends Phaser.Scene {
       pagoda: TEX.bgPagoda,
       canyon: TEX.bgCanyon,
       marsh: TEX.bgMarsh,
+      workshop: TEX.bgWorkshop,
       mountains: TEX.bg,
     } as const;
     const bgKey = bgKeys[level.bg ?? "mountains"];
@@ -133,6 +137,14 @@ export class GameScene extends Phaser.Scene {
       this.solidBoxes.push({ x: pl.x, y: pl.y, width: pl.width, height: pl.height });
     });
 
+    // Паперові стіни: суцільні, доки їх не розріжуть (колізія й для гравця, і для ворогів)
+    level.cuts?.forEach((def, i) => {
+      const panel = new CutPanel(this, def, level.id, i, rs);
+      this.cuts.push(panel);
+      solids.push(panel.zone);
+      this.solidBoxes.push(panel.box);
+    });
+
     this.physics.world.setBounds(
       0,
       0,
@@ -148,6 +160,8 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, spawn.x, spawn.y);
     this.player.frogEnabled = level.frog === true;
     this.player.shellEnabled = level.shell === true;
+    this.player.dashEnabled = level.dash === true;
+    this.player.glideDisabled = level.noGlide === true;
     this.physics.add.collider(this.player, solids);
 
     this.arrows = new ArrowPool(this);
@@ -277,6 +291,7 @@ export class GameScene extends Phaser.Scene {
     this.applyFire(delta);
     for (const w of this.waters) w.update(delta / 1000);
     this.applySwordHits();
+    this.applyDashCuts();
     this.syncHud();
     this.shadows.update((s) => (s.body as Phaser.Physics.Arcade.Body).blocked.down);
     if (this.phase === "playing") this.updateProgress();
@@ -483,6 +498,29 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Розрізає панель і прибирає її з solidBoxes, щоб стріли теж летіли крізь отвір. */
+  private sliceCut(c: CutPanel): void {
+    if (!c.slice()) return;
+    const i = this.solidBoxes.indexOf(c.box);
+    if (i >= 0) this.solidBoxes.splice(i, 1);
+    this.cameras.main.shake(70, 0.003);
+  }
+
+  /** Ривок різе всі панелі (і товсті) перед гравцем. */
+  private applyDashCuts(): void {
+    if (this.player.stateName !== "dash" || this.cuts.length === 0) return;
+    const b = this.player.body as Phaser.Physics.Arcade.Body;
+    const reach = tuning.dash.cutReach;
+    const dir = this.player.facing;
+    const box = {
+      x: dir > 0 ? b.x : b.x - reach,
+      y: b.y,
+      width: b.width + reach,
+      height: b.height,
+    };
+    for (const c of this.cuts) if (boxesOverlap(box, c.box)) this.sliceCut(c);
+  }
+
   /** Меч у активній фазі б'є кожного ворога один раз за змах. */
   private applySwordHits(): void {
     const box = this.player.swordBox();
@@ -493,6 +531,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (!box) return;
     this.arrows.deflect(box);
+    for (const c of this.cuts) if (!c.tough && boxesOverlap(box, c.box)) this.sliceCut(c);
     for (const v of this.vanes) {
       if (!v.strike(box)) continue;
       for (const w of this.winds) if (w.gate === v.id) w.unlock();

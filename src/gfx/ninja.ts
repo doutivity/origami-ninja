@@ -89,6 +89,22 @@ export function frog(p: Palette): string {
   ].join("")}</g>`;
 }
 
+/** Ніндзя, скручений у зірку-сюрікен: чотири гострі промені й пов'язка в центрі. Центр у (32, 37). */
+export function shuriken(p: Palette): string {
+  return `<g ${gap(p)}>${[
+    poly("32,4 37,30 32,37 27,30", p.ink),
+    poly("60,37 34,42 32,37 34,32", p.ink),
+    poly("32,70 27,44 32,37 37,44", p.ink),
+    poly("4,37 30,32 32,37 30,42", p.ink),
+    poly("32,4 37,30 32,37", p.muted, 'fill-opacity="0.5"'),
+    poly("60,37 34,42 32,37", p.muted, 'fill-opacity="0.5"'),
+    poly("32,70 27,44 32,37", p.muted, 'fill-opacity="0.5"'),
+    poly("4,37 30,32 32,37", p.muted, 'fill-opacity="0.5"'),
+    `<circle cx="32" cy="37" r="7" fill="${p.accent}"/>`,
+    `<circle cx="32" cy="37" r="2.4" fill="${p.paper}"/>`,
+  ].join("")}</g>`;
+}
+
 /** Орігамі-черепаха: ніндзя під гранчастим панциром, із голови видно лише очі. Низ на y≈60. */
 export function shell(p: Palette): string {
   const ink = p.ink;
