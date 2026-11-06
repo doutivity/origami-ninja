@@ -5,10 +5,11 @@ import { entry as canyon } from "./003-midnight-canyon.ts";
 import { entry as marsh } from "./004-ink-marsh.ts";
 import { entry as workshop } from "./005-kirigami-workshop.ts";
 import { entry as sea } from "./006-paper-sea.ts";
+import { entry as quiet } from "./007-quiet-fold.ts";
 import type { DevlogEntry } from "./types.ts";
 
 export type { DevlogEntry } from "./types.ts";
 
-export const devlog: DevlogEntry[] = [prototype, pagoda, canyon, marsh, workshop, sea].sort(
+export const devlog: DevlogEntry[] = [prototype, pagoda, canyon, marsh, workshop, sea, quiet].sort(
   (a, b) => b.date.localeCompare(a.date),
 );

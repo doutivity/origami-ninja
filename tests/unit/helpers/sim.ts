@@ -124,7 +124,8 @@ export function simulate(
     for (const s of solids) {
       const box = { x: x - d.w / 2, y: feet - d.h, w: d.w, h: d.h };
       if (!overlap(box, s)) continue;
-      x = ctx.vx > 0 ? s.x - d.w / 2 : s.x + s.w + d.w / 2;
+      // Епсилон: без нього похибка float лишає тіло «всередині» стіни, і вертикальна колізія підсаджує його нагору
+      x = ctx.vx > 0 ? s.x - d.w / 2 - 1e-6 : s.x + s.w + d.w / 2 + 1e-6;
       ctx.vx = 0;
     }
     feet += ctx.vy * DT;

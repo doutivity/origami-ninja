@@ -622,6 +622,54 @@ test("Paper Sea Storm: waves move the boat and the sail beats the headwind", asy
   expect(errors).toEqual([]);
 });
 
+test("Quiet Fold: every form is switched on and the level starts like the first one", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "keyboard flow is covered on desktop");
+  test.setTimeout(60_000);
+  const errors = collectErrors(page);
+  await page.goto("play/?debug=1");
+  await waitForGame(page);
+
+  type Scene = {
+    scene: { restart(): void };
+    registry: { set(k: string, v: unknown): void };
+    player?: {
+      x: number;
+      body: { blocked: { down: boolean } };
+      frogEnabled: boolean;
+      shellEnabled: boolean;
+      dashEnabled: boolean;
+      sailEnabled: boolean;
+    };
+  };
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.registry.set("levelId", "quiet-fold");
+    g.registry.set("checkpoint", -1);
+    g.scene.restart();
+  });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+          const p = g.player;
+          return p
+            ? {
+                grounded: p.body.blocked.down,
+                forms: [p.frogEnabled, p.shellEnabled, p.dashEnabled, p.sailEnabled],
+              }
+            : null;
+        }),
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toEqual({ grounded: true, forms: [true, true, true, true] });
+  await page.screenshot({ path: "test-results/quiet-fold-start.png" });
+  expect(errors).toEqual([]);
+});
+
 test.describe("mobile", () => {
   test.skip(({ isMobile }) => !isMobile, "touch controls need a phone profile");
 

@@ -20,11 +20,11 @@ const sea: WaterDef = {
 const flat: WaterDef = { x: 0, y: 450, width: 800, height: 90 };
 
 describe("paper sea level", () => {
-  it("is valid and the last level so far", () => {
+  it("is valid and registered", () => {
     expect(validateLevel(paperSea)).toEqual([]);
     expect(LEVELS).toContain(paperSea);
     expect(nextLevel("kirigami-workshop")).toBe(paperSea);
-    expect(nextLevel("paper-sea")).toBeNull();
+    expect(nextLevel("paper-sea")?.id).toBe("quiet-fold");
   });
 
   it("has waves, fish and the sail", () => {

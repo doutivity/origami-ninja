@@ -5,6 +5,7 @@ import { kirigamiWorkshop } from "./kirigami-workshop.ts";
 import { midnightCanyon } from "./midnight-canyon.ts";
 import { mountain } from "./mountain.ts";
 import { paperSea } from "./paper-sea.ts";
+import { quietFold } from "./quiet-fold.ts";
 import type { LevelDef } from "./types.ts";
 
 /** Усі доступні рівні гри за порядком проходження. */
@@ -16,6 +17,7 @@ export const LEVELS: readonly LevelDef[] = [
   inkMarsh,
   kirigamiWorkshop,
   paperSea,
+  quietFold,
 ];
 
 export function getLevel(idOrIndex: string | number): LevelDef {
