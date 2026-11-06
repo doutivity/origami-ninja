@@ -64,6 +64,13 @@ export function validateLevel(level: LevelDef): string[] {
     if ((level.vanes ?? []).findIndex((o) => o.id === v.id) !== i)
       err(`vane ${i}: duplicate id "${v.id}"`);
   });
+  level.inks?.forEach((k, i) => {
+    if (k.width <= 0) err(`ink ${i}: non-positive width`);
+    const lies = level.platforms.some(
+      (p) => Math.abs(p.y - k.y) < 1 && k.x >= p.x - 1 && k.x + k.width <= p.x + p.width + 1,
+    );
+    if (!lies) err(`ink ${i}: not lying on one platform`);
+  });
   level.cranes?.forEach((c, i) => {
     if (c.range <= 0) err(`crane ${i}: non-positive range`);
     if (!inWorld(c.x - c.range, c.y) || !inWorld(c.x + c.range, c.y))
@@ -94,6 +101,8 @@ export function validateLevel(level: LevelDef): string[] {
   }
   if (level.finish.x < level.spawn.x) err("finish is left of the spawn");
 
+  // Рівні без вітру (заплава) не про планер: прірви під нього там не потрібні
+  if (level.winds.length === 0) return errors;
   // Хоча б одна прірва, яку без планера не пройти
   const sorted = [...level.platforms].sort((a, b) => a.x - b.x);
   let widest = 0;

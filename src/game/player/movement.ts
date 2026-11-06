@@ -12,7 +12,8 @@ const approach = (value: number, target: number, step: number): number =>
 export function moveHorizontally(ctx: PlayerContext): void {
   const dir = axisX(ctx.input);
   if (dir !== 0) ctx.facing = dir;
-  const target = dir * t.runSpeed;
+  const slow = ctx.inInk && ctx.onGround ? tuning.ink.runScale : 1;
+  const target = dir * t.runSpeed * slow;
   const accel =
     dir === 0 ? (ctx.onGround ? t.runDecel : t.airDecel) : ctx.onGround ? t.runAccel : t.airAccel;
   ctx.vx = approach(ctx.vx, target, accel * ctx.dt);
@@ -25,7 +26,7 @@ export function jumpRequested(ctx: PlayerContext): boolean {
 
 /** Починає стрибок: задає вертикальну швидкість і "витрачає" натиск та coyote-вікно. */
 export function startJump(ctx: PlayerContext): void {
-  ctx.vy = -t.jumpVelocity;
+  ctx.vy = -t.jumpVelocity * (ctx.inInk ? tuning.ink.jumpScale : 1);
   ctx.jumpBufferMs = Number.POSITIVE_INFINITY;
   ctx.coyoteMs = Number.POSITIVE_INFINITY;
 }

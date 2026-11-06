@@ -365,6 +365,94 @@ test("Midnight Canyon: a sword hit on the weathervane wakes the wind tunnel", as
   expect(errors).toEqual([]);
 });
 
+test("Ink Marsh: holding Attack folds into a shell that survives one hit", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "keyboard flow is covered on desktop");
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+  await page.goto("play/?debug=1");
+  await waitForGame(page);
+
+  type Scene = {
+    scene: { restart(): void };
+    registry: { set(k: string, v: unknown): void };
+    player?: {
+      x: number;
+      y: number;
+      inInk: boolean;
+      stateName: string;
+      health: { hp: number; invulnerableMs: number };
+      shellGuard: { ready: boolean };
+      body: { blocked: { down: boolean } };
+      setPosition(x: number, y: number): void;
+      takeDamage(n: number, fromX: number): boolean;
+    };
+  };
+  const snap = () =>
+    page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      const p = g.player;
+      return p
+        ? {
+            x: p.x,
+            y: p.y,
+            state: p.stateName,
+            grounded: p.body.blocked.down,
+            inInk: p.inInk,
+            hp: p.health.hp,
+            shellReady: p.shellGuard.ready,
+          }
+        : null;
+    });
+
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.registry.set("levelId", "ink-marsh");
+    g.registry.set("checkpoint", -1);
+    g.scene.restart();
+  });
+  await expect.poll(async () => (await snap())?.grounded ?? false, { timeout: 30_000 }).toBe(true);
+  await page.screenshot({ path: "test-results/marsh-start.png" });
+
+  // Ставимо ніндзя в чорнило (пляма 600…1160, верх 440) далеко від ворогів і лучника
+  const standInInk = async () => {
+    await page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      g.player?.setPosition(700, 440 - 40);
+    });
+  };
+  await expect
+    .poll(
+      async () => {
+        const s = await snap();
+        if (s && !(s.grounded && s.x > 640 && s.x < 760)) await standInInk();
+        return !!s && s.grounded && s.inInk;
+      },
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toBe(true);
+
+  // Утримуємо Attack: ніндзя складається в панцир
+  await page.keyboard.down("KeyJ");
+  await expect
+    .poll(async () => (await snap())?.state, { timeout: 15_000, intervals: [100] })
+    .toBe("shell");
+  await page.screenshot({ path: "test-results/marsh-shell.png" });
+
+  // Удар у панцир: шкоди немає, панцир тріскає
+  const hpBefore = (await snap())?.hp ?? 0;
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.player?.takeDamage(20, 0);
+  });
+  await expect.poll(async () => (await snap())?.shellReady, { timeout: 5_000 }).toBe(false);
+  expect((await snap())?.hp).toBe(hpBefore);
+  await page.keyboard.up("KeyJ");
+  expect(errors).toEqual([]);
+});
+
 test.describe("mobile", () => {
   test.skip(({ isMobile }) => !isMobile, "touch controls need a phone profile");
 

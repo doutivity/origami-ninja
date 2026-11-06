@@ -10,6 +10,7 @@ import { FireZone } from "../fire/fire-zone.ts";
 import { RisingFire } from "../fire/rising-fire.ts";
 import { ArrowPool } from "../hazards/arrows.ts";
 import { Beam } from "../hazards/beam.ts";
+import { InkZone } from "../ink/ink-zone.ts";
 import { InputHub } from "../input/hub.ts";
 import { getLevel, nextLevel } from "../level/index.ts";
 import type { LevelDef } from "../level/types.ts";
@@ -42,6 +43,7 @@ export class GameScene extends Phaser.Scene {
   private waters: WaterZone[] = [];
   private beams: Beam[] = [];
   private vanes: Vane[] = [];
+  private inks: InkZone[] = [];
   /** Літаючі вороги не мають колізій із платформами й тіней */
   private fliers: Enemy[] = [];
   private arrows!: ArrowPool;
@@ -84,6 +86,7 @@ export class GameScene extends Phaser.Scene {
     this.waters = [];
     this.beams = [];
     this.vanes = [];
+    this.inks = [];
     this.fliers = [];
     this.rise = undefined;
     this.riseMs = 0;
@@ -104,6 +107,7 @@ export class GameScene extends Phaser.Scene {
       bamboo: TEX.bgBamboo,
       pagoda: TEX.bgPagoda,
       canyon: TEX.bgCanyon,
+      marsh: TEX.bgMarsh,
       mountains: TEX.bg,
     } as const;
     const bgKey = bgKeys[level.bg ?? "mountains"];
@@ -143,6 +147,7 @@ export class GameScene extends Phaser.Scene {
     const spawn = cpIndex >= 0 ? (level.checkpoints[cpIndex] ?? level.spawn) : level.spawn;
     this.player = new Player(this, spawn.x, spawn.y);
     this.player.frogEnabled = level.frog === true;
+    this.player.shellEnabled = level.shell === true;
     this.physics.add.collider(this.player, solids);
 
     this.arrows = new ArrowPool(this);
@@ -175,6 +180,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(5);
 
     for (const def of level.winds) this.winds.push(new WindZone(this, def, currentPalette()));
+    for (const def of level.inks ?? []) this.inks.push(new InkZone(this, def, currentPalette()));
     for (const def of level.vanes ?? []) this.vanes.push(new Vane(this, def));
     for (const def of level.waters ?? [])
       this.waters.push(new WaterZone(this, def, currentPalette()));
@@ -456,6 +462,8 @@ export class GameScene extends Phaser.Scene {
       this.player.inWater = false;
     }
     this.playerEmbers.emitting = this.player.inFire && !this.player.dead;
+    // Чорнило: сповільнює, поки гравець на землі в смузі плями
+    this.player.inInk = this.inks.some((k) => boxesOverlap(box, k.box));
     // Вітер: перша активна зона, у яку потрапив гравець (зони не перетинаються)
     const wind = this.winds.find((w) => w.active && boxesOverlap(box, w.box));
     this.player.inWind = wind !== undefined;

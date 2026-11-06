@@ -1,11 +1,18 @@
 import { bambooRiver } from "./bamboo-river.ts";
 import { burningPagoda } from "./burning-pagoda.ts";
+import { inkMarsh } from "./ink-marsh.ts";
 import { midnightCanyon } from "./midnight-canyon.ts";
 import { mountain } from "./mountain.ts";
 import type { LevelDef } from "./types.ts";
 
 /** Усі доступні рівні гри за порядком проходження. */
-export const LEVELS: readonly LevelDef[] = [mountain, bambooRiver, burningPagoda, midnightCanyon];
+export const LEVELS: readonly LevelDef[] = [
+  mountain,
+  bambooRiver,
+  burningPagoda,
+  midnightCanyon,
+  inkMarsh,
+];
 
 export function getLevel(idOrIndex: string | number): LevelDef {
   if (typeof idOrIndex === "number") {

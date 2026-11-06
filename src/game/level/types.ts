@@ -62,6 +62,13 @@ export interface CraneDef {
   range: number;
 }
 
+/** Чорнильна пляма на землі: x, y — лівий верхній кут (y — верх платформи). Сповільнює біг і стрибок. */
+export interface InkDef {
+  x: number;
+  y: number;
+  width: number;
+}
+
 /** Водна зона: x, y — лівий верхній кут поверхні води. */
 export interface WaterDef {
   x: number;
@@ -114,9 +121,11 @@ export interface LevelDef {
   id: string;
   name: string;
   /** Текстура фону (за замовчуванням "mountains") */
-  bg?: "mountains" | "bamboo" | "pagoda" | "canyon";
+  bg?: "mountains" | "bamboo" | "pagoda" | "canyon" | "marsh";
   /** Вертикальний рівень: ціль угорі, перевірка досяжності замість прірви для планера */
   vertical?: boolean;
+  /** Чи доступна форма черепахи (панцир при утриманні Attack) */
+  shell?: boolean;
   /** Чи доступна форма жабки (заряджений стрибок) */
   frog?: boolean;
   /** Підказка, що показується на старті рівня */
@@ -133,6 +142,7 @@ export interface LevelDef {
   waters?: WaterDef[];
   archers?: ArcherDef[];
   cranes?: CraneDef[];
+  inks?: InkDef[];
   vanes?: VaneDef[];
   beams?: BeamDef[];
   rise?: RiseDef;
