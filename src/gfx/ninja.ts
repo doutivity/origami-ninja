@@ -2,7 +2,7 @@
 // Планер — варіант C2: чорний дротик із ширшим візором і поясом на хвості.
 import type { Palette } from "./palette.ts";
 
-export type NinjaPose = "idle" | "run" | "glide";
+export type NinjaPose = "idle" | "run" | "glide" | "boat";
 
 const poly = (pts: string, fill: string, extra = "") =>
   `<polygon points="${pts}" fill="${fill}" ${extra}/>`;
@@ -34,6 +34,34 @@ export function glider(p: Palette): string {
     // Пояс на хвості: по смузі на кожному крилі
     poly("8,15.4 12,16.75 12,22.25 8,18.1", p.accent),
     poly("8,43.9 12,39.8 12,45.5 8,46.75", p.accent),
+  ].join("")}</g>`;
+}
+
+/** Орігамі-човник (сампан): персонаж складається в човен на воді. */
+export function boat(p: Palette): string {
+  const ink = p.ink;
+  return `<g ${gap(p)}>${[
+    // Корпус човника: лівий борт (корма)
+    poly("4,42 16,55 24,38 10,38", ink),
+    // Корпус човника: дно та центральний кіль (затінена грань)
+    poly("16,55 48,55 38,44 24,44", p.muted, 'fill-opacity="0.6"'),
+    // Корпус човника: правий борт (ніс)
+    poly("48,55 60,42 52,38 38,44", ink),
+    // Верхній фальшборт / палуба
+    poly("10,38 24,44 38,44 52,38 46,36 16,36", p.muted, 'fill-opacity="0.4"'),
+    // Центральне трикутне вітрило / орігамі-піраміда (ліва грань)
+    poly("32,14 18,36 32,36", p.paper, `stroke="${ink}" stroke-width="0.8"`),
+    // Центральне вітрило (права затінена грань)
+    poly("32,14 32,36 46,36", p.shade, `stroke="${ink}" stroke-width="0.8"`),
+    // Внутрішня кишеня складки вітрила
+    poly("26,36 32,24 38,36", ink),
+    // Візор на носі човна
+    poly("48,40 56,39 54,42 47,42", p.paper),
+    `<line x1="49" y1="40.8" x2="54.5" y2="40.2" stroke="${ink}" stroke-width="0.7"/>`,
+    // Червоний вимпел/хвіст пов'язки на верхівці вітрила
+    poly("32,14 26,10 14,8 3,5 15,13 27,16 32,17", p.accent),
+    // Червоний пояс уздовж борту
+    poly("12,42 20,41 42,41 50,42 46,45 16,45", p.accent),
   ].join("")}</g>`;
 }
 
@@ -312,5 +340,6 @@ export function puppetFigure(p: Palette, q: PuppetParams): string {
 
 export function puppet(pose: NinjaPose, p: Palette): string {
   if (pose === "glide") return glider(p);
+  if (pose === "boat") return boat(p);
   return puppetFigure(p, pose === "run" ? PUPPET_POSES.run0 : PUPPET_POSES.idle);
 }

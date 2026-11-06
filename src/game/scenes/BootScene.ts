@@ -1,7 +1,8 @@
 // BootScene: один раз генерує всі текстури з тих самих форм, що й сайт, і запускає гру.
 import Phaser from "phaser";
-import { glider, PUPPET_POSES, type PuppetPoseName, puppetFigure } from "../../gfx/ninja.ts";
+import { boat, glider, PUPPET_POSES, type PuppetPoseName, puppetFigure } from "../../gfx/ninja.ts";
 import {
+  bambooForest,
   blobShadow,
   checkpointFlag,
   finishGate,
@@ -9,19 +10,22 @@ import {
   mountains,
   oni,
   slash,
+  waterSurface,
 } from "../../gfx/scene.ts";
 import { burnedPolygon, emberPolygon } from "../combat/burn.ts";
 import { currentPalette, renderScale } from "../env.ts";
-import { mountain } from "../level/mountain.ts";
+import { LEVELS } from "../level/index.ts";
 import { rasterize, svgDoc } from "../rasterize.ts";
 import { tuning } from "../tuning.ts";
 
-/** Кадри гравця: пози ляльки й складений у літачок планер. */
-export type FrameName = PuppetPoseName | "glide";
+/** Кадри гравця: пози ляльки, складений у літачок планер та орігамі-човник. */
+export type FrameName = PuppetPoseName | "glide" | "boat";
 
 export const TEX = {
   ninja: (name: FrameName) => `ninja-${name}`,
   bg: "bg-mountains",
+  bgBamboo: "bg-bamboo",
+  water: "water-surface",
   oni: (frame: number) => `oni-${frame}`,
   slash: "slash",
   flame: "flame",
@@ -34,7 +38,10 @@ export const TEX = {
   shadow: "shadow",
   burnMask: (step: number) => `burn-mask-${step}`,
   burnEdge: (step: number) => `burn-edge-${step}`,
-  platform: (i: number) => `platform-${i}`,
+  platform: (levelIdOrIdx: string | number, i?: number) =>
+    typeof levelIdOrIdx === "number"
+      ? `platform-${levelIdOrIdx}`
+      : `platform-${levelIdOrIdx}-${i ?? 0}`,
 } as const;
 
 const setScene = (name: string) => {
@@ -85,6 +92,16 @@ export class BootScene extends Phaser.Scene {
         frames.set("glide", img);
       }),
     );
+
+    // Човник: сампан на воді (опущений донизу текстури)
+    jobs.push(
+      rasterize(
+        svgDoc(128, 128, "0 0 64 64", `<g transform="translate(0 10)">${boat(p)}</g>`),
+      ).then((img) => {
+        this.textures.addImage(TEX.ninja("boat"), img);
+        frames.set("boat", img);
+      }),
+    );
     // Чекпоінти, фінішні ворота й тінь-пляма
     add(TEX.checkpoint(false), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, false)));
     add(TEX.checkpoint(true), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, true)));
@@ -96,6 +113,9 @@ export class BootScene extends Phaser.Scene {
       TEX.gust,
       svgDoc(12, 56, "0 0 6 28", `<rect x="1.5" width="3" height="28" rx="1.5" fill="#fff"/>`),
     );
+
+    // Водна поверхня
+    add(TEX.water, svgDoc(120, 60, "0 0 120 60", waterSurface(p, 120, 60)));
 
     // Вогонь: кущ полум'я й біла «іскра» (колір задає емітер)
     add(TEX.flame, svgDoc(240, 260, "0 0 120 130", flameCluster(p)));
@@ -127,30 +147,34 @@ export class BootScene extends Phaser.Scene {
     for (const f of [0, 1] as const) add(TEX.oni(f), svgDoc(96, 120, "0 0 24 30", oni(p, f)));
     add(TEX.slash, svgDoc(200, 120, "0 0 100 60", slash(p)));
 
-    // Далекі гори: паралакс-фон
+    // Паралакс-фони: гори та бамбуковий ліс
     const bgW = 1920;
     const bgH = 540;
     add(TEX.bg, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, mountains(p, bgW, bgH, 90)));
+    add(TEX.bgBamboo, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, bambooForest(p, bgW, bgH, 50)));
 
-    // Платформи: по одній текстурі на платформу, з урахуванням масштабу рендеру
-    mountain.platforms.forEach((pl, i) => {
-      const lines: string[] = [];
-      for (let y = 22; y < pl.height; y += 18) {
-        lines.push(`M0,${y}H${pl.width}`);
-      }
-      const inner =
-        `<rect width="${pl.width}" height="${pl.height}" fill="${p.shade}"/>` +
-        `<path d="${lines.join("")}" stroke="${p.ink}" stroke-opacity="0.16" stroke-width="1" fill="none"/>` +
-        `<rect width="${pl.width}" height="6" fill="${p.ink}"/>`;
-      add(
-        TEX.platform(i),
-        svgDoc(
+    // Платформи для всіх рівнів
+    LEVELS.forEach((lvl) => {
+      lvl.platforms.forEach((pl, i) => {
+        const lines: string[] = [];
+        for (let y = 22; y < pl.height; y += 18) {
+          lines.push(`M0,${y}H${pl.width}`);
+        }
+        const inner =
+          `<rect width="${pl.width}" height="${pl.height}" fill="${p.shade}"/>` +
+          `<path d="${lines.join("")}" stroke="${p.ink}" stroke-opacity="0.16" stroke-width="1" fill="none"/>` +
+          `<rect width="${pl.width}" height="6" fill="${p.ink}"/>`;
+        const svg = svgDoc(
           Math.round(pl.width * rs),
           Math.round(pl.height * rs),
           `0 0 ${pl.width} ${pl.height}`,
           inner,
-        ),
-      );
+        );
+        add(TEX.platform(lvl.id, i), svg);
+        if (lvl.id === "mountain") {
+          add(TEX.platform(i), svg);
+        }
+      });
     });
 
     await Promise.all(jobs);

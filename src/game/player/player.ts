@@ -6,6 +6,7 @@ import { blinkVisible, Health } from "../combat/health.ts";
 import { emptyInput, type InputState } from "../input/input-state.ts";
 import { type FrameName, TEX } from "../scenes/BootScene.ts";
 import { tuning } from "../tuning.ts";
+import { stepBoat } from "../water/boat-motion.ts";
 import type { PlayerContext, StateName } from "./context.ts";
 import { tiltOf } from "./glide-model.ts";
 import { StateMachine } from "./state-machine.ts";
@@ -35,12 +36,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   locked = false;
   /** Чи стоїть гравець у вогні в цьому кадрі (виставляє GameScene) */
   inFire = false;
-  deathCause: "fire" | "enemy" | "fall" | null = null;
+  /** Чи пливе гравець у воді у формі орігамі-човника */
+  inWater = false;
+  waterSpeed = 0;
+  waterSurfaceY = 0;
+  /** Залишок cooldown повторного входу у воду після стрибка, мс */
+  waterExitMs = 0;
+  deathCause: "fire" | "enemy" | "fall" | "water" | null = null;
   /** Поточний візуальний кадр (для накладки обгоряння) */
   frameName: FrameName = "idle";
   /** Поточний кут нахилу літачка на екрані, градуси */
   private glideAngle = 0;
-  private glideBody = false;
+  private currentBodyMode: "normal" | "glide" | "boat" = "normal";
   /** Чи в зоні висхідного вітру (виставляє GameScene) */
   inWind = false;
   private runClock = 0;
@@ -131,8 +138,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return true;
   }
 
-  /** Миттєва смерть (падіння в прірву): зупиняємо тіло й вимикаємо керування. */
-  die(cause: "fire" | "fall" | "enemy"): void {
+  /** Миттєва смерть (падіння в прірву, потоплення): зупиняємо тіло й вимикаємо керування. */
+  die(cause: "fire" | "fall" | "enemy" | "water"): void {
     if (this.dead && this.deathCause) return;
     this.health.drain(this.health.max);
     this.deathCause = cause;
@@ -171,6 +178,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         ? { ...input, left: false, right: false, jumpHeld: false, jumpPressed: false }
         : input;
     ctx.dt = deltaMs / 1000;
+    this.waterExitMs = Math.max(0, this.waterExitMs - deltaMs);
     ctx.inWind = this.inWind;
     ctx.onGround = body.blocked.down || body.touching.down;
     ctx.vx = body.velocity.x;
@@ -180,7 +188,29 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     ctx.coyoteMs = ctx.onGround ? 0 : ctx.coyoteMs + deltaMs;
     ctx.jumpBufferMs = ctx.input.jumpPressed ? 0 : ctx.jumpBufferMs + deltaMs;
 
-    this.machine.update(ctx);
+    if (this.inWater && !this.dead) {
+      const step = stepBoat({
+        input,
+        blockedLeft: body.blocked.left,
+        blockedRight: body.blocked.right,
+        vx: ctx.vx,
+        bodyY: body.y,
+        targetY: this.waterSurfaceY - FEET_BELOW_CENTER + 20,
+        waterSpeed: this.waterSpeed,
+        dt: ctx.dt,
+      });
+      ctx.vx = step.vx;
+      ctx.vy = step.vy;
+      if (step.facing !== 0) ctx.facing = step.facing;
+      if (step.exit) {
+        this.inWater = false;
+        this.waterExitMs = tuning.boat.exitCooldownMs;
+        body.setAllowGravity(true);
+        this.machine.transition("jump", ctx);
+      }
+    } else {
+      this.machine.update(ctx);
+    }
     body.setVelocity(ctx.vx, ctx.vy);
     this.updateVisual(ctx);
   }
@@ -205,6 +235,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.foldMs -= ctx.dt * 1000;
       return "fold";
     }
+    if (this.inWater) return "boat";
     if (state === "glide") return "glide";
     if (this.attack.busy) return "attack";
     if (this.landMs > 0) {
@@ -234,21 +265,34 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.texture.key !== key) this.setTexture(key);
     // Миготіння під час невразливості
     this.setAlpha(blinkVisible(this.health.invulnerableMs) ? 1 : 0.35);
-    this.setBodyMode(this.machine.name === "glide");
-    this.setAngle(this.machine.name === "dead" ? ctx.facing * -80 : this.updateGlideAngle(ctx));
+    this.setBodyMode(this.machine.name === "glide", this.inWater);
+    let angle = 0;
+    if (this.machine.name === "dead") {
+      angle = ctx.facing * -80;
+    } else if (this.inWater) {
+      angle = Math.sin(this.scene.time.now / 160) * 4;
+    } else {
+      angle = this.updateGlideAngle(ctx);
+    }
+    this.setAngle(angle);
     this.updateSlash(ctx);
   }
 
-  /** Тіло планера нижче й ширше; низ тіла збігається зі стоячим, тож перемикання не заглиблює в землю. */
-  private setBodyMode(glide: boolean): void {
-    if (glide === this.glideBody) return;
-    this.glideBody = glide;
-    const spec = glide ? tuning.glide.body : tuning.player.body;
+  /** Тіло планера/човника нижче й ширше; гравітація світу вимикається під час польоту або плавання. */
+  private setBodyMode(glide: boolean, inWater = false): void {
+    const next = inWater ? "boat" : glide ? "glide" : "normal";
+    if (next === this.currentBodyMode) return;
+    this.currentBodyMode = next;
+    const spec =
+      next === "boat"
+        ? tuning.boat.body
+        : next === "glide"
+          ? tuning.glide.body
+          : tuning.player.body;
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(spec.width, spec.height, false);
     body.setOffset(spec.offsetX, spec.offsetY);
-    // Польотом керує модель планера, тож гравітацію світу на цей час вимикаємо
-    body.setAllowGravity(!glide);
+    body.setAllowGravity(next === "normal");
   }
 
   /** Кут літачка плавно слідує за нахилом ↑/↓; у інших станах 0. */

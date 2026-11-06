@@ -82,6 +82,13 @@ export const tuning = {
     /** Тіло планера: низ збігається з низом тіла стоячи (текстура 128 px) */
     body: { width: 76, height: 34, offsetX: 26, offsetY: 90 },
   },
+  boat: {
+    speed: 210,
+    accel: 1200,
+    /** Скільки мс після стрибка з води човник не вмикається знову (щоб можна було вилізти) */
+    exitCooldownMs: 450,
+    body: { width: 70, height: 32, offsetX: 29, offsetY: 92 },
+  },
   wind: {
     /** Жорсткий ліміт живих часток вітру на зону */
     maxPerZone: 18,

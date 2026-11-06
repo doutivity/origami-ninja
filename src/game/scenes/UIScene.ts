@@ -11,12 +11,19 @@ import { tuning } from "../tuning.ts";
 
 interface OverlayData {
   kind: "dead" | "complete";
-  cause?: "fire" | "fall" | "enemy";
+  cause?: "fire" | "fall" | "enemy" | "water";
   timeMs?: number;
   deaths?: number;
+  levelName?: string;
+  nextLevelName?: string;
 }
 
-const TITLES = { fire: "You burned", fall: "You fell", enemy: "You were caught" } as const;
+const TITLES = {
+  fire: "You burned",
+  fall: "You fell",
+  enemy: "You were caught",
+  water: "You drowned",
+} as const;
 
 const formatTime = (ms: number): string => {
   const total = Math.floor(ms / 1000);
@@ -178,9 +185,12 @@ export class UIScene extends Phaser.Scene {
         this.overlayTitle?.setText(TITLES[data.cause ?? "enemy"]);
         this.overlaySub?.setText(`${action} to respawn at the checkpoint`);
       } else {
+        const nextHint = data.nextLevelName
+          ? `\n${action} for ${data.nextLevelName}`
+          : `\n${action} to play again`;
         this.overlayTitle?.setText("Level complete");
         this.overlaySub?.setText(
-          `Time ${formatTime(data.timeMs ?? 0)} · Deaths ${data.deaths ?? 0}\n${action} to play again`,
+          `Time ${formatTime(data.timeMs ?? 0)} · Deaths ${data.deaths ?? 0}${nextHint}`,
         );
       }
       this.overlayLayer?.setVisible(true);

@@ -9,4 +9,4 @@ export const GAME_EVENTS = {
   overlayAction: "game:overlay_action",
 } as const;
 
-export type DeathCause = "fire" | "fall" | "enemy";
+export type DeathCause = "fire" | "fall" | "enemy" | "water";

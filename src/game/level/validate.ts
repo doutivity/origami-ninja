@@ -51,6 +51,10 @@ export function validateLevel(level: LevelDef): string[] {
     if (w.width <= 0 || w.height <= 0) err(`wind ${i}: non-positive size`);
     if (!inWorld(w.x, w.y)) err(`wind ${i}: outside the world`);
   });
+  level.waters?.forEach((w, i) => {
+    if (w.width <= 0 || w.height <= 0) err(`water ${i}: non-positive size`);
+    if (!inWorld(w.x, w.y)) err(`water ${i}: outside the world`);
+  });
   level.checkpoints.forEach((c, i) => {
     if (!under(level.platforms, c.x, c.y)) err(`checkpoint ${i}: not standing on a platform`);
   });

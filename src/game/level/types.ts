@@ -36,6 +36,16 @@ export interface WindDef {
   height: number;
 }
 
+/** Водна зона: x, y — лівий верхній кут поверхні води. */
+export interface WaterDef {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Швидкість поверхневої течії в пікселях/с (додатна — праворуч) */
+  currentSpeed?: number;
+}
+
 /** Чекпоінт: x — центр, y — рівень ніг (верх платформи). */
 export interface CheckpointDef {
   x: number;
@@ -53,6 +63,8 @@ export interface FinishDef {
 export interface LevelDef {
   id: string;
   name: string;
+  /** Текстура фону (за замовчуванням "mountains") */
+  bg?: "mountains" | "bamboo";
   /** Розмір світу в пікселях */
   width: number;
   height: number;
@@ -62,6 +74,7 @@ export interface LevelDef {
   enemies: EnemyDef[];
   fires: FireDef[];
   winds: WindDef[];
+  waters?: WaterDef[];
   checkpoints: CheckpointDef[];
   finish: FinishDef;
 }

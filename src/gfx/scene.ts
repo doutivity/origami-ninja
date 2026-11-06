@@ -124,3 +124,85 @@ export function finishGate(p: Palette): string {
 export function blobShadow(p: Palette): string {
   return `<ellipse cx="32" cy="8" rx="30" ry="7" fill="${p.ink}" fill-opacity="0.28"/>`;
 }
+
+/** Бамбуковий ліс для рівня «Бамбукова річка»: стовбури з вузлами та орігамі-листям. */
+export function bambooForest(p: Palette, w: number, h: number, top: number): string {
+  const k = w / 1200;
+  // Стовбури дальнього плану
+  const farStalks = [70, 180, 310, 430, 560, 680, 800, 930, 1070]
+    .map((bx) => {
+      const x = bx * k;
+      const bw = 12 * k;
+      return (
+        poly(`${x},${top} ${x + bw},${top + 6} ${x + bw},${h} ${x},${h}`, p.shade) +
+        [140, 240, 340, 440]
+          .map((y) =>
+            poly(
+              `${x - 2},${y} ${x + bw + 2},${y + 4} ${x + bw + 1},${y + 9} ${x - 1},${y + 5}`,
+              p.muted,
+              'fill-opacity="0.45"',
+            ),
+          )
+          .join("")
+      );
+    })
+    .join("");
+
+  // Стовбури ближнього плану з орігамі-листям
+  const nearStalks = [120, 250, 380, 500, 630, 750, 880, 1010, 1140]
+    .map((bx) => {
+      const x = bx * k;
+      const bw = 18 * k;
+      return (
+        poly(
+          `${x},${top + 20} ${x + bw},${top + 28} ${x + bw},${h} ${x},${h}`,
+          p.muted,
+          'fill-opacity="0.4"',
+        ) +
+        poly(
+          `${x + bw},${top + 100} ${x + bw + 45 * k},${top + 80} ${x + bw},${top + 120}`,
+          p.muted,
+          'fill-opacity="0.55"',
+        ) +
+        poly(
+          `${x},${top + 180} ${x - 40 * k},${top + 160} ${x},${top + 200}`,
+          p.muted,
+          'fill-opacity="0.55"',
+        ) +
+        [180, 300, 420]
+          .map((y) =>
+            poly(
+              `${x - 3},${y} ${x + bw + 3},${y + 5} ${x + bw + 2},${y + 11} ${x - 2},${y + 6}`,
+              p.ink,
+              'fill-opacity="0.3"',
+            ),
+          )
+          .join("")
+      );
+    })
+    .join("");
+
+  const reeds = poly(
+    `0,${h - 40} 40,${h - 100} 70,${h - 30} 120,${h - 80} 160,${h - 20} 240,${h - 90} ${w},${h - 40} ${w},${h} 0,${h}`,
+    p.shade,
+  );
+
+  return farStalks + nearStalks + reeds;
+}
+
+/** Водна поверхня з геометричними орігамі-хвилями (хвилеподібні ламані лінії). */
+export function waterSurface(p: Palette, w: number, h: number): string {
+  const segs = 10;
+  const dx = w / segs;
+  const crests: string[] = [];
+  for (let i = 0; i <= segs; i++) {
+    const x = i * dx;
+    const y = i % 2 === 0 ? 3 : 12;
+    crests.push(`${x},${y}`);
+  }
+  const pts = `0,${h} ${crests.join(" ")} ${w},${h}`;
+  return (
+    poly(pts, p.shade, 'fill-opacity="0.6"') +
+    `<path d="${crests.map((pt, i) => `${i === 0 ? "M" : "L"}${pt}`).join(" ")}" stroke="${p.paper}" stroke-width="2.5" fill="none" stroke-linejoin="round"/>`
+  );
+}

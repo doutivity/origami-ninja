@@ -6,7 +6,8 @@ import { type DeathCause, GAME_EVENTS } from "../events.ts";
 import { BurnOverlay } from "../fire/burn-overlay.ts";
 import { FireZone } from "../fire/fire-zone.ts";
 import { InputHub } from "../input/hub.ts";
-import { mountain } from "../level/mountain.ts";
+import { getLevel, nextLevel } from "../level/index.ts";
+import type { LevelDef } from "../level/types.ts";
 import { Checkpoint } from "../objects/checkpoint.ts";
 import { Shadows } from "../objects/shadows.ts";
 import { Player } from "../player/player.ts";
@@ -18,6 +19,7 @@ import {
   setQuality,
 } from "../quality.ts";
 import { tuning } from "../tuning.ts";
+import { WaterZone } from "../water/water-zone.ts";
 import { WindZone } from "../wind/wind-zone.ts";
 import { TEX } from "./BootScene.ts";
 
@@ -27,9 +29,11 @@ export class GameScene extends Phaser.Scene {
   private hub!: InputHub;
   private player!: Player;
   private bg!: Phaser.GameObjects.Image;
+  private currentLevelDef!: LevelDef;
   private enemies: Enemy[] = [];
   private fires: FireZone[] = [];
   private winds: WindZone[] = [];
+  private waters: WaterZone[] = [];
   private checkpoints: Checkpoint[] = [];
   private shadows!: Shadows;
   private overlay!: BurnOverlay;
@@ -51,7 +55,9 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     const el = document.getElementById("game");
     if (el) el.dataset.scene = "GameScene";
-    const level = mountain;
+    const levelId = (this.registry.get("levelId") as string | undefined) ?? "mountain";
+    const level = getLevel(levelId);
+    this.currentLevelDef = level;
     const rs = renderScale();
     const cam = this.cameras.main;
     cam.setBackgroundColor(hexToNumber(currentPalette().paper));
@@ -59,6 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies = [];
     this.fires = [];
     this.winds = [];
+    this.waters = [];
     this.checkpoints = [];
     this.cullTimer = 0;
     this.lastHp = -1;
@@ -71,13 +78,14 @@ export class GameScene extends Phaser.Scene {
     this.governor = getGovernor();
 
     // Паралакс рахуємо вручну від вікна камери: scrollFactor разом із zoom зсуває фон по вертикалі
-    this.bg = this.add.image(0, 0, TEX.bg).setOrigin(0, 0).setDepth(-10);
+    const bgKey = level.bg === "bamboo" ? TEX.bgBamboo : TEX.bg;
+    this.bg = this.add.image(0, 0, bgKey).setOrigin(0, 0).setDepth(-10);
 
     // Платформи: видимі картинки + статичні фізичні тіла
     const solids: Phaser.GameObjects.Zone[] = [];
     level.platforms.forEach((pl, i) => {
       this.add
-        .image(pl.x, pl.y, TEX.platform(i))
+        .image(pl.x, pl.y, TEX.platform(level.id, i))
         .setOrigin(0, 0)
         .setScale(1 / rs);
       const zone = this.add.zone(pl.x + pl.width / 2, pl.y + pl.height / 2, pl.width, pl.height);
@@ -112,6 +120,8 @@ export class GameScene extends Phaser.Scene {
       .setDepth(5);
 
     for (const def of level.winds) this.winds.push(new WindZone(this, def, currentPalette()));
+    for (const def of level.waters ?? [])
+      this.waters.push(new WaterZone(this, def, currentPalette()));
 
     // Вогонь: зони й іскри на гравцеві (обидва з жорсткими лімітами частинок)
     const pal = currentPalette();
@@ -183,6 +193,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies = this.enemies.filter((e) => e.active);
 
     this.applyFire(delta);
+    for (const w of this.waters) w.update(delta / 1000);
     this.applySwordHits();
     this.syncHud();
     this.shadows.update((s) => (s.body as Phaser.Physics.Arcade.Body).blocked.down);
@@ -193,7 +204,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Смерть, чекпоінти й фініш. */
   private updateProgress(): void {
-    const level = mountain;
+    const level = this.currentLevelDef;
     const b = this.player.body as Phaser.Physics.Arcade.Body;
     const box = { x: b.x, y: b.y, width: b.width, height: b.height };
 
@@ -241,11 +252,14 @@ export class GameScene extends Phaser.Scene {
     this.player.locked = true;
     this.registry.set("runMs", this.runMs);
     this.game.events.emit(GAME_EVENTS.levelComplete, { ms: Math.round(this.runMs) });
+    const next = nextLevel(this.currentLevelDef.id);
     this.time.delayedCall(500, () =>
       this.showOverlay({
         kind: "complete",
         timeMs: this.runMs,
         deaths: (this.registry.get("deaths") as number | undefined) ?? 0,
+        levelName: this.currentLevelDef.name,
+        nextLevelName: next?.name,
       }),
     );
   }
@@ -255,7 +269,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set("overlay", data);
   }
 
-  /** R або тап по оверлею: смерть → респавн на чекпоінті; фініш → повний рестарт. */
+  /** R або тап по оверлею: смерть → респавн на чекпоінті; фініш → повний рестарт або наступний рівень. */
   private onOverlayAction(): void {
     if (
       this.overlayShownAt === 0 ||
@@ -272,10 +286,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restartRun(): void {
-    this.registry.set("checkpoint", -1);
-    this.registry.set("runMs", 0);
-    this.registry.set("deaths", 0);
+    const next = nextLevel(this.currentLevelDef.id);
+    // Новий забіг: level_start і таймер стартують знову
     this.registry.set("runStarted", false);
+    if (next) {
+      this.registry.set("levelId", next.id);
+      this.registry.set("checkpoint", -1);
+      this.registry.set("toast", next.name);
+    } else {
+      this.registry.set("levelId", "mountain");
+      this.registry.set("checkpoint", -1);
+      this.registry.set("deaths", 0);
+      this.registry.set("runMs", 0);
+    }
     this.scene.restart();
   }
 
@@ -294,6 +317,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(rs);
     for (const f of this.fires) f.applyQuality(q);
     for (const w of this.winds) w.applyQuality(q);
+    for (const w of this.waters) w.applyQuality(q);
     this.playerEmbers.maxAliveParticles = Math.max(
       1,
       Math.round(tuning.particles.maxOnPlayer * q.particleScale),
@@ -303,15 +327,31 @@ export class GameScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.qualityChanged, getQuality());
   }
 
-  /** Вогонь: шкода за секунду, обгоряння, іскри на гравці; іскри зон — лише біля камери. */
+  /** Вогонь і вода: шкода за секунду, обгоряння, плавання у формі човна. */
   private applyFire(deltaMs: number): void {
     const b = this.player.body as Phaser.Physics.Arcade.Body;
     const box = { x: b.x, y: b.y, width: b.width, height: b.height };
     if (this.phase === "playing") {
       this.player.inFire = this.fires.some((f) => boxesOverlap(box, f.box));
       if (this.player.inFire) this.player.applyFire(deltaMs / 1000);
+
+      // Вода: плавання в орігамі-човнику або потоплення при падінні у воду
+      const inWater =
+        this.player.waterExitMs > 0 ? undefined : this.waters.find((w) => boxesOverlap(box, w.box));
+      if (inWater && !this.player.dead) {
+        this.player.inWater = true;
+        this.player.waterSpeed = inWater.currentSpeed;
+        this.player.waterSurfaceY = inWater.surfaceY;
+        if (b.y > inWater.surfaceY + 44) {
+          this.player.die("water");
+          this.beginDeath("water");
+        }
+      } else {
+        this.player.inWater = false;
+      }
     } else {
       this.player.inFire = false;
+      this.player.inWater = false;
     }
     this.playerEmbers.emitting = this.player.inFire && !this.player.dead;
     this.player.inWind = this.winds.some((w) => boxesOverlap(box, w.box));
