@@ -8,6 +8,7 @@ import {
   PUPPET_POSES,
   type PuppetPoseName,
   puppetFigure,
+  shell,
 } from "../../gfx/ninja.ts";
 import {
   archer,
@@ -20,6 +21,7 @@ import {
   finishGate,
   fireArrow,
   flameCluster,
+  marshBackdrop,
   mountains,
   oni,
   pagodaBackdrop,
@@ -34,7 +36,7 @@ import { rasterize, svgDoc } from "../rasterize.ts";
 import { tuning } from "../tuning.ts";
 
 /** Кадри гравця: пози ляльки, складений у літачок планер та орігамі-човник. */
-export type FrameName = PuppetPoseName | "glide" | "boat" | "frog" | "frogLeap";
+export type FrameName = PuppetPoseName | "glide" | "boat" | "frog" | "frogLeap" | "shell";
 
 export const TEX = {
   ninja: (name: FrameName) => `ninja-${name}`,
@@ -42,6 +44,7 @@ export const TEX = {
   bgBamboo: "bg-bamboo",
   bgPagoda: "bg-pagoda",
   bgCanyon: "bg-canyon",
+  bgMarsh: "bg-marsh",
   crane: (frame: number) => `crane-${frame}`,
   vane: (open: boolean) => (open ? "vane-open" : "vane-closed"),
   ring: "ring",
@@ -140,6 +143,15 @@ export class BootScene extends Phaser.Scene {
         frames.set("frogLeap", img);
       }),
     );
+    // Черепаха: панцир (низ опущено до низу текстури, як у жабки)
+    jobs.push(
+      rasterize(
+        svgDoc(128, 128, "0 0 64 64", `<g transform="translate(0 2)">${shell(p)}</g>`),
+      ).then((img) => {
+        this.textures.addImage(TEX.ninja("shell"), img);
+        frames.set("shell", img);
+      }),
+    );
     // Чекпоінти, фінішні ворота й тінь-пляма
     add(TEX.checkpoint(false), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, false)));
     add(TEX.checkpoint(true), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, true)));
@@ -209,6 +221,7 @@ export class BootScene extends Phaser.Scene {
     add(TEX.bg, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, mountains(p, bgW, bgH, 90)));
     add(TEX.bgPagoda, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, pagodaBackdrop(p, bgW, bgH)));
     add(TEX.bgCanyon, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, canyonBackdrop(p, bgW, bgH)));
+    add(TEX.bgMarsh, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, marshBackdrop(p, bgW, bgH)));
     add(TEX.bgBamboo, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, bambooForest(p, bgW, bgH, 50)));
 
     // Платформи для всіх рівнів

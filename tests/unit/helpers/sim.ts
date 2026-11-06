@@ -1,5 +1,7 @@
 // Безголова симуляція гравця для перевірки балансу рівня: той самий state machine і tuning,
 // що й у грі, плюс спрощена фізика (гравітація, AABB-зіткнення з платформами, вітер).
+
+import { inkBox } from "../../../src/game/ink/ink-model.ts";
 import { emptyInput, type InputState } from "../../../src/game/input/input-state.ts";
 import type { LevelDef } from "../../../src/game/level/types.ts";
 import type { PlayerContext } from "../../../src/game/player/context.ts";
@@ -168,6 +170,10 @@ export function simulate(
     ctx.input = inp;
     ctx.onGround = onGround;
     ctx.inWind = inWind;
+    ctx.inInk = (level.inks ?? []).some((k) => {
+      const b = inkBox(k);
+      return overlap(box, { x: b.x, y: b.y, w: b.width, h: b.height });
+    });
     ctx.coyoteMs = onGround ? 0 : ctx.coyoteMs + DT * 1000;
     ctx.jumpBufferMs = pressNow ? 0 : ctx.jumpBufferMs + DT * 1000;
     machine.update(ctx);

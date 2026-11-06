@@ -45,9 +45,9 @@ function window(level: LevelDef, from: number, to: number, policy: Policy, gates
 describe("midnight canyon level", () => {
   it("is valid and registered after the pagoda", () => {
     expect(validateLevel(midnightCanyon)).toEqual([]);
-    expect(LEVELS.at(-1)).toBe(midnightCanyon);
+    expect(LEVELS).toContain(midnightCanyon);
     expect(nextLevel("burning-pagoda")).toBe(midnightCanyon);
-    expect(nextLevel("midnight-canyon")).toBeNull();
+    expect(nextLevel("midnight-canyon")?.id).toBe("ink-marsh");
   });
 
   it("has every new element: ring, down draft, gated lift, vane, cranes", () => {

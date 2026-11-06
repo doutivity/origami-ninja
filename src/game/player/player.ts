@@ -10,6 +10,7 @@ import { stepBoat } from "../water/boat-motion.ts";
 import type { PlayerContext, StateName } from "./context.ts";
 import { chargeFraction } from "./frog-model.ts";
 import { tiltOf, type WindEffect } from "./glide-model.ts";
+import { ShellGuard, shellWanted } from "./shell-model.ts";
 import { StateMachine } from "./state-machine.ts";
 import { ChargeState } from "./states/charge.ts";
 import { DeadState } from "./states/dead.ts";
@@ -19,6 +20,7 @@ import { HurtState } from "./states/hurt.ts";
 import { IdleState } from "./states/idle.ts";
 import { JumpState } from "./states/jump.ts";
 import { RunState } from "./states/run.ts";
+import { ShellState } from "./states/shell.ts";
 
 const RUN_FRAMES: readonly FrameName[] = ["run0", "run1", "run2", "run3"];
 // Відстань від центру спрайта до ніг у пікселях екрана (текстура 128 px, ступні ≈ y=124)
@@ -49,9 +51,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   frameName: FrameName = "idle";
   /** Поточний кут нахилу літачка на екрані, градуси */
   private glideAngle = 0;
-  private currentBodyMode: "normal" | "glide" | "boat" | "frog" = "normal";
+  private currentBodyMode: "normal" | "glide" | "boat" | "frog" | "shell" = "normal";
   /** Форма жабки доступна на рівні (виставляє GameScene) */
   frogEnabled = false;
+  /** Форма черепахи доступна на рівні (виставляє GameScene) */
+  shellEnabled = false;
+  /** Панцир: тримає один удар, потім тріскає */
+  readonly shellGuard = new ShellGuard();
+  /** Чи стоїть гравець у чорнилі (виставляє GameScene) */
+  inInk = false;
+  private attackHeldMs = 0;
   private readonly chargeState = new ChargeState();
   private prevJumpHeld = false;
   private groundHeldMs = 0;
@@ -105,6 +114,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         new FallState(),
         new GlideState(),
         this.chargeState,
+        new ShellState(),
         new HurtState(),
         new DeadState(),
       ],
@@ -126,7 +136,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private get canAttack(): boolean {
     const s = this.machine.name;
-    return s !== "hurt" && s !== "dead" && s !== "charge";
+    return s !== "hurt" && s !== "dead" && s !== "charge" && s !== "shell";
   }
 
   /** Хітбокс меча, поки він активний; інакше null. */
@@ -138,6 +148,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   /** Шкода від ворога/вогню. Повертає true, якщо шкода застосована. */
   takeDamage(amount: number, fromX: number): boolean {
+    // Панцир тримає один удар: шкоди немає, але панцир тріскає й ніндзя розкладається
+    if (this.machine.name === "shell" && !this.health.invulnerable && this.shellGuard.block()) {
+      this.health.invulnerableMs = tuning.shell.blockInvulnerableMs;
+      this.scene.cameras.main.shake(80, 0.004);
+      return true;
+    }
     if (!this.health.damage(amount)) return false;
     const body = this.body as Phaser.Physics.Arcade.Body;
     const away = this.x < fromX ? -1 : 1;
@@ -186,6 +202,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     const ctx = this.ctx;
     this.health.update(deltaMs);
+    this.shellGuard.update(deltaMs);
     if (input.attackPressed && this.canAttack) this.attack.start();
     if (!this.canAttack) this.attack.phase = "idle";
     this.attack.update(deltaMs);
@@ -211,6 +228,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.prevJumpHeld = held;
     this.waterExitMs = Math.max(0, this.waterExitMs - deltaMs);
     ctx.inWind = this.inWind;
+    ctx.inInk = this.inInk;
+    // Утримання Attack на землі складає панцир (лише на рівнях із shell)
+    this.attackHeldMs = input.attackHeld && onGroundNow ? this.attackHeldMs + deltaMs : 0;
+    ctx.shellReady = this.shellGuard.ready;
+    ctx.shellRequested = shellWanted({
+      enabled: this.shellEnabled,
+      ready: this.shellGuard.ready,
+      onGround: onGroundNow,
+      attackHeldMs: this.attackHeldMs,
+    });
     ctx.wind = this.inWind ? this.wind : null;
     ctx.onGround = body.blocked.down || body.touching.down;
     ctx.vx = body.velocity.x;
@@ -272,6 +299,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.inWater) return "boat";
     if (state === "glide") return "glide";
     if (state === "charge") return "frog";
+    if (state === "shell") return "shell";
     if (state === "jump" && this.leaping && ctx.vy < 0) return "frogLeap";
     if (this.attack.busy) return "attack";
     if (this.landMs > 0) {
@@ -301,7 +329,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.texture.key !== key) this.setTexture(key);
     // Миготіння під час невразливості
     this.setAlpha(blinkVisible(this.health.invulnerableMs) ? 1 : 0.35);
-    this.setBodyMode(this.machine.name === "glide", this.inWater, this.machine.name === "charge");
+    this.setBodyMode(
+      this.machine.name === "glide",
+      this.inWater,
+      this.machine.name === "charge",
+      this.machine.name === "shell",
+    );
     let angle = 0;
     if (this.machine.name === "dead") {
       angle = ctx.facing * -80;
@@ -315,8 +348,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Тіло планера/човника нижче й ширше; гравітація світу вимикається під час польоту або плавання. */
-  private setBodyMode(glide: boolean, inWater = false, frog = false): void {
-    const next = inWater ? "boat" : glide ? "glide" : frog ? "frog" : "normal";
+  private setBodyMode(glide: boolean, inWater = false, frog = false, shell = false): void {
+    const next = inWater ? "boat" : glide ? "glide" : frog ? "frog" : shell ? "shell" : "normal";
     if (next === this.currentBodyMode) return;
     this.currentBodyMode = next;
     const spec =
@@ -326,12 +359,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
           ? tuning.glide.body
           : next === "frog"
             ? tuning.frog.body
-            : tuning.player.body;
+            : next === "shell"
+              ? tuning.shell.body
+              : tuning.player.body;
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(spec.width, spec.height, false);
     body.setOffset(spec.offsetX, spec.offsetY);
     // Гравітація світу вимкнена лише в польоті планера й на воді; у присіді жабки діє, щоб тіло стояло на землі
-    body.setAllowGravity(next === "normal" || next === "frog");
+    body.setAllowGravity(next === "normal" || next === "frog" || next === "shell");
   }
 
   /** Кут літачка плавно слідує за нахилом ↑/↓; у інших станах 0. */

@@ -7,6 +7,7 @@ export class RunState implements PlayerState {
   readonly name = "run" as const;
 
   update(ctx: PlayerContext): StateName | null {
+    if (ctx.shellRequested && ctx.onGround) return "shell";
     moveHorizontally(ctx);
     const jump = groundJump(ctx);
     if (jump) return jump;

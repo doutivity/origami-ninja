@@ -9,6 +9,8 @@ export interface InputState {
   /** Jump натиснуто саме в цьому кадрі */
   jumpPressed: boolean;
   attackPressed: boolean;
+  /** Attack утримується (для панцира) */
+  attackHeld: boolean;
   restartPressed: boolean;
 }
 
@@ -20,6 +22,7 @@ export const emptyInput = (): InputState => ({
   jumpHeld: false,
   jumpPressed: false,
   attackPressed: false,
+  attackHeld: false,
   restartPressed: false,
 });
 

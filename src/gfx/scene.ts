@@ -341,6 +341,55 @@ export function weathervane(p: Palette, open: boolean): string {
   ].join("");
 }
 
+/** Чорнильна заплава: розмиті гори тушшю, очерет і чорнильні краплі, що стікають із неба. */
+export function marshBackdrop(p: Palette, w: number, h: number): string {
+  const parts: string[] = [];
+  // Далекі гори, написані тушшю
+  const hills = (
+    base: number,
+    step: number,
+    amp: number,
+    seed: number,
+    fill: string,
+    op: number,
+  ) => {
+    const pts = [`0,${h}`];
+    for (let x = 0; x <= w; x += step) {
+      const k = (Math.floor(x / step) * seed) % 5;
+      pts.push(`${x},${base - (k / 4) * amp}`);
+    }
+    pts.push(`${w},${h}`);
+    return poly(pts.join(" "), fill, `fill-opacity="${op}"`);
+  };
+  parts.push(
+    hills(360, 200, 140, 3, p.shade, 1),
+    hills(420, 150, 90, 7, p.muted, 0.35),
+    hills(470, 110, 60, 4, p.ink, 0.28),
+  );
+  // Чорнильні кола-«плями» на небі
+  for (let i = 0; i < 5; i++) {
+    const x = 160 + ((i * 397) % (w - 200));
+    const y = 70 + ((i * 53) % 120);
+    parts.push(
+      `<circle cx="${x}" cy="${y}" r="${26 + (i % 3) * 14}" fill="${p.ink}" fill-opacity="0.08"/>`,
+    );
+  }
+  // Очерет
+  for (let i = 0; i < 26; i++) {
+    const x = (i * 77) % w;
+    const top = 330 + ((i * 29) % 70);
+    parts.push(
+      `<line x1="${x}" y1="${h}" x2="${x + (i % 2 ? 6 : -6)}" y2="${top}" stroke="${p.ink}" stroke-opacity="0.32" stroke-width="3" stroke-linecap="round"/>`,
+      poly(
+        `${x + (i % 2 ? 6 : -6)},${top} ${x + (i % 2 ? 12 : -12)},${top + 22} ${x + (i % 2 ? 4 : -4)},${top + 18}`,
+        p.ink,
+        'fill-opacity="0.32"',
+      ),
+    );
+  }
+  return parts.join("");
+}
+
 /** Нічний каньйон: далекі скелі, місяць із ореолом, зірки й паперові смуги хмар. */
 export function canyonBackdrop(p: Palette, w: number, h: number): string {
   const parts: string[] = [];

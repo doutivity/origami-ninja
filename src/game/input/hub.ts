@@ -52,6 +52,7 @@ export class InputHub {
       jumpHeld: k("SPACE") || this.touch.jump,
       jumpPressed: jumpDown || jumpTouchEdge,
       attackPressed: attackDown || attackTouchEdge,
+      attackHeld: k("J") || this.touch.attack,
       restartPressed: restartDown,
     };
     this.prevJump = this.touch.jump;

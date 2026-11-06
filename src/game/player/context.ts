@@ -2,7 +2,16 @@ import type { InputState } from "../input/input-state.ts";
 import type { WindEffect } from "./glide-model.ts";
 
 /** Імена станів гравця. Нові стани (glide) додаються разом зі своїми механіками. */
-export type StateName = "idle" | "run" | "jump" | "fall" | "glide" | "charge" | "hurt" | "dead";
+export type StateName =
+  | "idle"
+  | "run"
+  | "jump"
+  | "fall"
+  | "glide"
+  | "charge"
+  | "shell"
+  | "hurt"
+  | "dead";
 
 /**
  * Контекст кадру для станів. Не залежить від Phaser, тому state machine тестується окремо.
@@ -25,6 +34,12 @@ export interface PlayerContext {
   wind?: WindEffect | null;
   /** Напрямок погляду: -1 ліворуч, 1 праворуч */
   facing: -1 | 1;
+  /** Гравець стоїть у чорнилі (сповільнює біг і стрибок, крім форми панцира) */
+  inInk?: boolean;
+  /** Утримання Attack достатнє, щоб скластись у панцир (рахує Player) */
+  shellRequested?: boolean;
+  /** Панцир ще цілий (не тріснув після удару) */
+  shellReady?: boolean;
   /** Форма жабки доступна на цьому рівні (за замовчуванням ні) */
   frogEnabled?: boolean;
   /** Скільки мс поспіль Jump утримується на землі */

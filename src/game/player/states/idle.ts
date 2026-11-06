@@ -7,6 +7,7 @@ export class IdleState implements PlayerState {
   readonly name = "idle" as const;
 
   update(ctx: PlayerContext): StateName | null {
+    if (ctx.shellRequested && ctx.onGround) return "shell";
     moveHorizontally(ctx);
     const jump = groundJump(ctx);
     if (jump) return jump;
