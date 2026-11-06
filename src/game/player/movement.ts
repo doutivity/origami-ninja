@@ -30,6 +30,28 @@ export function startJump(ctx: PlayerContext): void {
   ctx.coyoteMs = Number.POSITIVE_INFINITY;
 }
 
+/**
+ * Рішення про стрибок на землі.
+ * Без жабки — миттєвий стрибок за натиском. З жабкою — тап стрибає при відпусканні,
+ * а утримання Jump довше за chargeStartMs починає заряд.
+ */
+export function groundJump(ctx: PlayerContext): "jump" | "charge" | null {
+  if (!ctx.frogEnabled) {
+    if (!jumpRequested(ctx)) return null;
+    startJump(ctx);
+    return "jump";
+  }
+  if (ctx.onGround && ctx.input.jumpHeld && (ctx.groundHeldMs ?? 0) >= tuning.frog.chargeStartMs)
+    return "charge";
+  if (ctx.jumpTap || (!ctx.onGround && jumpRequested(ctx))) {
+    startJump(ctx);
+    // Тап уже відпущено до початку стрибка, тож обрізання висоти зробило б кожен стрибок коротким
+    if (ctx.jumpTap) ctx.skipJumpCut = true;
+    return "jump";
+  }
+  return null;
+}
+
 export const clampFall = (ctx: PlayerContext): void => {
   if (ctx.vy > t.maxFallSpeed) ctx.vy = t.maxFallSpeed;
 };

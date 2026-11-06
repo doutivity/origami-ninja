@@ -124,3 +124,187 @@ export function finishGate(p: Palette): string {
 export function blobShadow(p: Palette): string {
   return `<ellipse cx="32" cy="8" rx="30" ry="7" fill="${p.ink}" fill-opacity="0.28"/>`;
 }
+
+/** Бамбуковий ліс для рівня «Бамбукова річка»: стовбури з вузлами та орігамі-листям. */
+export function bambooForest(p: Palette, w: number, h: number, top: number): string {
+  const k = w / 1200;
+  // Стовбури дальнього плану
+  const farStalks = [70, 180, 310, 430, 560, 680, 800, 930, 1070]
+    .map((bx) => {
+      const x = bx * k;
+      const bw = 12 * k;
+      return (
+        poly(`${x},${top} ${x + bw},${top + 6} ${x + bw},${h} ${x},${h}`, p.shade) +
+        [140, 240, 340, 440]
+          .map((y) =>
+            poly(
+              `${x - 2},${y} ${x + bw + 2},${y + 4} ${x + bw + 1},${y + 9} ${x - 1},${y + 5}`,
+              p.muted,
+              'fill-opacity="0.45"',
+            ),
+          )
+          .join("")
+      );
+    })
+    .join("");
+
+  // Стовбури ближнього плану з орігамі-листям
+  const nearStalks = [120, 250, 380, 500, 630, 750, 880, 1010, 1140]
+    .map((bx) => {
+      const x = bx * k;
+      const bw = 18 * k;
+      return (
+        poly(
+          `${x},${top + 20} ${x + bw},${top + 28} ${x + bw},${h} ${x},${h}`,
+          p.muted,
+          'fill-opacity="0.4"',
+        ) +
+        poly(
+          `${x + bw},${top + 100} ${x + bw + 45 * k},${top + 80} ${x + bw},${top + 120}`,
+          p.muted,
+          'fill-opacity="0.55"',
+        ) +
+        poly(
+          `${x},${top + 180} ${x - 40 * k},${top + 160} ${x},${top + 200}`,
+          p.muted,
+          'fill-opacity="0.55"',
+        ) +
+        [180, 300, 420]
+          .map((y) =>
+            poly(
+              `${x - 3},${y} ${x + bw + 3},${y + 5} ${x + bw + 2},${y + 11} ${x - 2},${y + 6}`,
+              p.ink,
+              'fill-opacity="0.3"',
+            ),
+          )
+          .join("")
+      );
+    })
+    .join("");
+
+  const reeds = poly(
+    `0,${h - 40} 40,${h - 100} 70,${h - 30} 120,${h - 80} 160,${h - 20} 240,${h - 90} ${w},${h - 40} ${w},${h} 0,${h}`,
+    p.shade,
+  );
+
+  return farStalks + nearStalks + reeds;
+}
+
+/** Водна поверхня з геометричними орігамі-хвилями (хвилеподібні ламані лінії). */
+export function waterSurface(p: Palette, w: number, h: number): string {
+  const segs = 10;
+  const dx = w / segs;
+  const crests: string[] = [];
+  for (let i = 0; i <= segs; i++) {
+    const x = i * dx;
+    const y = i % 2 === 0 ? 3 : 12;
+    crests.push(`${x},${y}`);
+  }
+  const pts = `0,${h} ${crests.join(" ")} ${w},${h}`;
+  return (
+    poly(pts, p.shade, 'fill-opacity="0.6"') +
+    `<path d="${crests.map((pt, i) => `${i === 0 ? "M" : "L"}${pt}`).join(" ")}" stroke="${p.paper}" stroke-width="2.5" fill="none" stroke-linejoin="round"/>`
+  );
+}
+
+/** Лучник у квадраті 32×30: онi (зсунутий на 4 одиниці вправо) з луком; frame 1 — тятива натягнута зі стрілою. */
+export function archer(p: Palette, frame: 0 | 1): string {
+  const bowX = 27;
+  const bow = `<path d="M${bowX - 2},4 Q${bowX + 5},15 ${bowX - 2},26" stroke="${p.ink}" stroke-width="1.4" fill="none" stroke-linecap="round"/>`;
+  const string =
+    frame === 0
+      ? `<line x1="${bowX - 2}" y1="4" x2="${bowX - 2}" y2="26" stroke="${p.muted}" stroke-width="0.5"/>`
+      : `<polyline points="${bowX - 2},4 ${bowX - 9},15 ${bowX - 2},26" stroke="${p.muted}" stroke-width="0.5" fill="none"/>` +
+        poly(`${bowX - 9},14 ${bowX + 6},14.4 ${bowX + 6},15.6 ${bowX - 9},16`, p.ink) +
+        poly(`${bowX + 6},13 ${bowX + 9},15 ${bowX + 6},17`, p.fire);
+  return `<g transform="translate(4 0)">${oni(p, 0)}</g>${bow}${string}`;
+}
+
+/** Вогняна стріла у прямокутнику 20×4: деревце, наконечник-полум'я й іскра на хвості. */
+export function fireArrow(p: Palette): string {
+  return [
+    `<rect x="3" y="1.4" width="12" height="1.2" fill="${p.ink}"/>`,
+    poly("15,0 20,2 15,4", p.fire),
+    poly("15,0.9 18,2 15,3.1", p.paper),
+    poly("0,0.4 4,2 0,3.6", p.accent),
+  ].join("");
+}
+
+/** Палаюча балка: дерев'яний брус із червоними обмотками та полум'ям зверху. Квадрат 64×40, брус внизу (висота 24). */
+export function burningBeam(p: Palette): string {
+  return [
+    poly(
+      "0,16 64,16 64,40 0,40",
+      p.shade,
+      `stroke="${p.ink}" stroke-width="2" stroke-linejoin="round"`,
+    ),
+    `<path d="M0,22H64M0,28H64M0,34H64" stroke="${p.ink}" stroke-opacity="0.25" stroke-width="1"/>`,
+    poly("8,16 14,16 14,40 8,40", p.accent),
+    poly("50,16 56,16 56,40 50,40", p.accent),
+    flame(18, 17, 26, p),
+    flame(34, 17, 32, p),
+    flame(48, 17, 22, p),
+  ].join("");
+}
+
+/** Фон «Палаюча пагода»: багатоярусна вежа в сутінках, ліхтарі й розсувні перегородки. */
+export function pagodaBackdrop(p: Palette, w: number, h: number): string {
+  const cx = w * 0.33;
+  const parts: string[] = [];
+  // Сітка перегородок сьодзі: ледь помітні лінії
+  for (let x = 0; x < w; x += 96) {
+    parts.push(
+      `<rect x="${x}" y="0" width="2" height="${h}" fill="${p.muted}" fill-opacity="0.12"/>`,
+    );
+  }
+  for (let y = 60; y < h; y += 96) {
+    parts.push(
+      `<rect x="0" y="${y}" width="${w}" height="2" fill="${p.muted}" fill-opacity="0.12"/>`,
+    );
+  }
+  // Ярусна пагода
+  for (let t = 0; t < 5; t++) {
+    const base = h - 24 - t * 96;
+    const half = 230 - t * 36;
+    const body = half * 0.66;
+    parts.push(
+      poly(
+        `${cx - body},${base} ${cx + body},${base} ${cx + body},${base - 56} ${cx - body},${base - 56}`,
+        p.shade,
+      ),
+      poly(
+        `${cx - body * 0.5},${base} ${cx + body * 0.5},${base} ${cx + body * 0.5},${base - 56} ${cx - body * 0.5},${base - 56}`,
+        p.muted,
+        'fill-opacity="0.35"',
+      ),
+      poly(
+        `${cx - half - 38},${base - 46} ${cx - half * 0.6},${base - 74} ${cx + half * 0.6},${base - 74} ${cx + half + 38},${base - 46} ${cx + half},${base - 58} ${cx - half},${base - 58}`,
+        p.ink,
+        'fill-opacity="0.5"',
+      ),
+      poly(
+        `${cx - half},${base - 58} ${cx + half},${base - 58} ${cx + half - 6},${base - 64} ${cx - half + 6},${base - 64}`,
+        p.accent,
+        'fill-opacity="0.6"',
+      ),
+    );
+  }
+  parts.push(
+    poly(
+      `${cx - 8},${h - 24 - 4 * 96 - 74} ${cx + 8},${h - 24 - 4 * 96 - 74} ${cx},${h - 24 - 4 * 96 - 130}`,
+      p.ink,
+      'fill-opacity="0.5"',
+    ),
+  );
+  // Ліхтарі на нитках
+  const lanterns = [140, 330, 560, 760, 900, 1180, 1420, 1650];
+  lanterns.forEach((lx, i) => {
+    const ly = 90 + ((i * 53) % 170);
+    parts.push(
+      `<line x1="${lx}" y1="0" x2="${lx}" y2="${ly}" stroke="${p.ink}" stroke-opacity="0.4" stroke-width="2"/>`,
+      `<ellipse cx="${lx}" cy="${ly + 18}" rx="14" ry="19" fill="${p.accent}" fill-opacity="0.8"/>`,
+      `<rect x="${lx - 8}" y="${ly - 2}" width="16" height="5" fill="${p.ink}" fill-opacity="0.6"/>`,
+    );
+  });
+  return parts.join("");
+}

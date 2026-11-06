@@ -111,6 +111,158 @@ test("fire hurts, a death overlay appears and R respawns", async ({ page, isMobi
     .toBe(true);
 });
 
+test("Bamboo River: the boat climbs out of the water onto the bank", async ({ page, isMobile }) => {
+  test.skip(isMobile, "keyboard flow is covered on desktop");
+  test.setTimeout(90_000);
+  await page.goto("play/?debug=1");
+  await waitForGame(page);
+
+  type Scene = {
+    scene: { restart(): void };
+    registry: { set(k: string, v: unknown): void };
+    player?: {
+      x: number;
+      y: number;
+      inWater: boolean;
+      body: { blocked: { down: boolean } };
+      setPosition(x: number, y: number): void;
+    };
+  };
+  const state = () =>
+    page.evaluate(() => {
+      const p = (window.__origami.scene.getScene("GameScene") as unknown as Scene).player;
+      return p ? { x: p.x, y: p.y, inWater: p.inWater, grounded: p.body.blocked.down } : null;
+    });
+
+  // Перемикаємося на рівень 2 і чекаємо, поки сцена створить гравця заново
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.registry.set("levelId", "bamboo-river");
+    g.registry.set("checkpoint", -1);
+    g.scene.restart();
+  });
+
+  // Кидаємо гравця в першу протоку (вода 680…1220, поверхня y=450) біля лівого берега
+  await expect
+    .poll(
+      async () => {
+        await page.evaluate(() => {
+          const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+          if (g.player && g.player.x < 600) g.player.setPosition(740, 400);
+        });
+        return (await state())?.inWater ?? false;
+      },
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toBe(true);
+
+  // Пливемо ліворуч: човник упирається в берег і має вилізти на нього сам
+  await page.keyboard.down("ArrowLeft");
+  await expect
+    .poll(
+      async () => {
+        const s = await state();
+        return !!s && !s.inWater && s.grounded && s.x < 680 && s.y < 450;
+      },
+      { timeout: 45_000, intervals: [200] },
+    )
+    .toBe(true);
+  await page.keyboard.up("ArrowLeft");
+});
+
+test("Burning Pagoda: the frog leap reaches a high ledge and the fire wall climbs", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "keyboard flow is covered on desktop");
+  test.setTimeout(120_000);
+  await page.goto("play/?debug=1");
+  await waitForGame(page);
+
+  type Scene = {
+    scene: { restart(): void };
+    registry: { set(k: string, v: unknown): void };
+    rise?: { topY: number };
+    player?: {
+      x: number;
+      y: number;
+      charge: number;
+      machine: { name: string };
+      body: { blocked: { down: boolean } };
+      setPosition(x: number, y: number): void;
+    };
+  };
+  const snap = () =>
+    page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      const p = g.player;
+      return p
+        ? {
+            x: p.x,
+            y: p.y,
+            charge: p.charge,
+            state: p.machine.name,
+            grounded: p.body.blocked.down,
+            wall: g.rise?.topY ?? null,
+          }
+        : null;
+    });
+
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.registry.set("levelId", "burning-pagoda");
+    g.registry.set("checkpoint", -1);
+    g.scene.restart();
+  });
+  // Стіна вогню існує на цьому рівні й стоїть нижче за гравця
+  await expect.poll(async () => (await snap())?.wall ?? null, { timeout: 30_000 }).not.toBeNull();
+  await page.screenshot({ path: "test-results/pagoda-start.png" });
+
+  // Телепортуємо на карниз біля чекпоінта (верх 1700) просто під високим карнизом (верх 1480)
+  const standOnLedge = async () => {
+    await page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      g.player?.setPosition(700, 1700 - 40);
+    });
+  };
+  await expect
+    .poll(
+      async () => {
+        const s = await snap();
+        if (s && !(s.grounded && s.y > 1600 && s.y < 1700)) await standOnLedge();
+        return !!s && s.grounded && Math.abs(s.y - (1700 - 36)) < 12;
+      },
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toBe(true);
+
+  // Заряджаємо стрибок до максимуму, далі стрибаємо вліво на карниз 220 px вище (звичайний стрибок — лише ~136)
+  await page.keyboard.down("Space");
+  await expect
+    .poll(async () => (await snap())?.charge ?? 0, { timeout: 30_000, intervals: [100] })
+    .toBeGreaterThan(0.95);
+  await page.screenshot({ path: "test-results/pagoda-charge.png" });
+  await page.keyboard.down("ArrowLeft");
+  await page.keyboard.up("Space");
+  await expect
+    .poll(
+      async () => {
+        const s = await snap();
+        return !!s && s.grounded && s.y < 1500 && s.y > 1400 && s.x > 400 && s.x < 660;
+      },
+      { timeout: 30_000, intervals: [100] },
+    )
+    .toBe(true);
+  await page.keyboard.up("ArrowLeft");
+  await page.screenshot({ path: "test-results/pagoda-ledge.png" });
+
+  // Стіна вогню піднімається (після затримки)
+  const wall0 = (await snap())?.wall ?? 0;
+  await expect
+    .poll(async () => (await snap())?.wall ?? wall0, { timeout: 60_000, intervals: [500] })
+    .toBeLessThan(wall0 - 5);
+});
+
 test.describe("mobile", () => {
   test.skip(({ isMobile }) => !isMobile, "touch controls need a phone profile");
 

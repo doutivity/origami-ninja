@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { bambooRiver } from "../../src/game/level/bamboo-river.ts";
 import { mountain } from "../../src/game/level/mountain.ts";
 import type { LevelDef } from "../../src/game/level/types.ts";
 import { maxPlainJumpDistance, validateLevel } from "../../src/game/level/validate.ts";
@@ -25,6 +26,28 @@ describe("mountain level", () => {
 
   it("has a gap wider than a plain jump", () => {
     const sorted = [...mountain.platforms].sort((a, b) => a.x - b.x);
+    let widest = 0;
+    let reach = 0;
+    for (const p of sorted) {
+      widest = Math.max(widest, p.x - reach);
+      reach = Math.max(reach, p.x + p.width);
+    }
+    expect(widest).toBeGreaterThan(maxPlainJumpDistance());
+  });
+});
+
+describe("bamboo river level", () => {
+  it("is valid", () => {
+    expect(validateLevel(bambooRiver)).toEqual([]);
+  });
+
+  it("has water zones and water speed", () => {
+    expect(bambooRiver.waters?.length).toBeGreaterThan(0);
+    expect(bambooRiver.waters?.[0]?.currentSpeed).toBeGreaterThan(0);
+  });
+
+  it("has a gap wider than a plain jump", () => {
+    const sorted = [...bambooRiver.platforms].sort((a, b) => a.x - b.x);
     let widest = 0;
     let reach = 0;
     for (const p of sorted) {

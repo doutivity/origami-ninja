@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { glider, PUPPET_POSES, puppetFigure } from "../../src/gfx/ninja.ts";
+import { boat, glider, PUPPET_POSES, puppetFigure } from "../../src/gfx/ninja.ts";
 import { dark, light } from "../../src/theme/tokens.ts";
 
 describe("puppet poses", () => {
@@ -18,6 +18,7 @@ describe("puppet poses", () => {
       "attack",
       "fold",
       "hurt",
+      "land",
     ]) {
       expect(names).toContain(n);
     }
@@ -50,5 +51,10 @@ describe("puppet poses", () => {
   it("the glider is a pure shape with the palette accent", () => {
     expect(glider(light)).toContain(light.accent);
     expect(glider(dark)).toContain(dark.ink);
+  });
+
+  it("the boat renders valid origami shape with accent", () => {
+    expect(boat(light)).toContain(light.accent);
+    expect(boat(dark)).toContain(dark.accent);
   });
 });

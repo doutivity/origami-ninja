@@ -8,6 +8,7 @@ const PAGES = [
   { path: "controls/", title: /Controls/ },
   { path: "devlog/", title: /Devlog/ },
   { path: "devlog/prototype/", title: /Prototype/ },
+  { path: "devlog/burning-pagoda/", title: /Pagoda/ },
   { path: "privacy/", title: /Privacy/ },
 ];
 
