@@ -8,8 +8,10 @@ import { type FrameName, TEX } from "../scenes/BootScene.ts";
 import { tuning } from "../tuning.ts";
 import { stepBoat } from "../water/boat-motion.ts";
 import type { PlayerContext, StateName } from "./context.ts";
+import { chargeFraction } from "./frog-model.ts";
 import { tiltOf } from "./glide-model.ts";
 import { StateMachine } from "./state-machine.ts";
+import { ChargeState } from "./states/charge.ts";
 import { DeadState } from "./states/dead.ts";
 import { FallState } from "./states/fall.ts";
 import { GlideState } from "./states/glide.ts";
@@ -47,7 +49,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   frameName: FrameName = "idle";
   /** Поточний кут нахилу літачка на екрані, градуси */
   private glideAngle = 0;
-  private currentBodyMode: "normal" | "glide" | "boat" = "normal";
+  private currentBodyMode: "normal" | "glide" | "boat" | "frog" = "normal";
+  /** Форма жабки доступна на рівні (виставляє GameScene) */
+  frogEnabled = false;
+  private readonly chargeState = new ChargeState();
+  private prevJumpHeld = false;
+  private groundHeldMs = 0;
+  /** Триває стрибок жабки (до апогею) */
+  private leaping = false;
   /** Чи в зоні висхідного вітру (виставляє GameScene) */
   inWind = false;
   private runClock = 0;
@@ -93,6 +102,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         new JumpState(),
         new FallState(),
         new GlideState(),
+        this.chargeState,
         new HurtState(),
         new DeadState(),
       ],
@@ -114,7 +124,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private get canAttack(): boolean {
     const s = this.machine.name;
-    return s !== "hurt" && s !== "dead";
+    return s !== "hurt" && s !== "dead" && s !== "charge";
   }
 
   /** Хітбокс меча, поки він активний; інакше null. */
@@ -151,10 +161,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.machine.transition("dead", this.ctx);
   }
 
+  /** Заряд присіду жабки 0…1 (для візуалу). */
+  get charge(): number {
+    return this.machine.name === "charge" ? chargeFraction(this.chargeState.chargeMs) : 0;
+  }
+
   /** Шкода від вогню за кадр: без невразливості й відкидання, зате росте обгорілість. */
-  applyFire(dtSec: number): void {
+  applyFire(dtSec: number, dps: number = tuning.fire.damagePerSecond): void {
     if (this.health.dead) return;
-    const dmg = tuning.fire.damagePerSecond * dtSec;
+    const dmg = dps * dtSec;
     this.health.drain(dmg);
     this.burn = burnAfter(this.burn, dmg, this.health.max);
     if (this.health.dead) {
@@ -178,6 +193,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         ? { ...input, left: false, right: false, jumpHeld: false, jumpPressed: false }
         : input;
     ctx.dt = deltaMs / 1000;
+    ctx.frogEnabled = this.frogEnabled;
+    // Утримання Jump на землі (для заряду жабки) і тап із відкладеним стрибком
+    const held = ctx.input.jumpHeld;
+    const onGroundNow = body.blocked.down || body.touching.down;
+    ctx.jumpTap =
+      this.frogEnabled &&
+      this.prevJumpHeld &&
+      !held &&
+      onGroundNow &&
+      this.groundHeldMs < tuning.frog.chargeStartMs &&
+      this.machine.name !== "charge";
+    this.groundHeldMs = held && onGroundNow ? this.groundHeldMs + deltaMs : 0;
+    ctx.groundHeldMs = this.groundHeldMs;
+    this.prevJumpHeld = held;
     this.waterExitMs = Math.max(0, this.waterExitMs - deltaMs);
     ctx.inWind = this.inWind;
     ctx.onGround = body.blocked.down || body.touching.down;
@@ -230,6 +259,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     ) {
       this.landMs = tuning.player.landMs;
     }
+    if (state === "jump" && this.prevState === "charge") this.leaping = true;
+    if (state !== "jump") this.leaping = false;
     this.prevState = state;
     if (this.foldMs > 0) {
       this.foldMs -= ctx.dt * 1000;
@@ -237,6 +268,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
     if (this.inWater) return "boat";
     if (state === "glide") return "glide";
+    if (state === "charge") return "frog";
+    if (state === "jump" && this.leaping && ctx.vy < 0) return "frogLeap";
     if (this.attack.busy) return "attack";
     if (this.landMs > 0) {
       this.landMs -= ctx.dt * 1000;
@@ -265,7 +298,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.texture.key !== key) this.setTexture(key);
     // Миготіння під час невразливості
     this.setAlpha(blinkVisible(this.health.invulnerableMs) ? 1 : 0.35);
-    this.setBodyMode(this.machine.name === "glide", this.inWater);
+    this.setBodyMode(this.machine.name === "glide", this.inWater, this.machine.name === "charge");
     let angle = 0;
     if (this.machine.name === "dead") {
       angle = ctx.facing * -80;
@@ -279,8 +312,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Тіло планера/човника нижче й ширше; гравітація світу вимикається під час польоту або плавання. */
-  private setBodyMode(glide: boolean, inWater = false): void {
-    const next = inWater ? "boat" : glide ? "glide" : "normal";
+  private setBodyMode(glide: boolean, inWater = false, frog = false): void {
+    const next = inWater ? "boat" : glide ? "glide" : frog ? "frog" : "normal";
     if (next === this.currentBodyMode) return;
     this.currentBodyMode = next;
     const spec =
@@ -288,11 +321,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         ? tuning.boat.body
         : next === "glide"
           ? tuning.glide.body
-          : tuning.player.body;
+          : next === "frog"
+            ? tuning.frog.body
+            : tuning.player.body;
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(spec.width, spec.height, false);
     body.setOffset(spec.offsetX, spec.offsetY);
-    body.setAllowGravity(next === "normal");
+    // Гравітація світу вимкнена лише в польоті планера й на воді; у присіді жабки діє, щоб тіло стояло на землі
+    body.setAllowGravity(next === "normal" || next === "frog");
   }
 
   /** Кут літачка плавно слідує за нахилом ↑/↓; у інших станах 0. */

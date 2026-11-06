@@ -13,8 +13,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   dead = false;
   /** Номер удару, який востаннє влучив у ворога (щоб один змах бив один раз) */
   lastHitSwing = -1;
-  private dir: -1 | 1 = 1;
-  private stunMs = 0;
+  protected dir: -1 | 1 = 1;
+  protected stunMs = 0;
   private walkClock = 0;
   private readonly left: number;
   private readonly right: number;
@@ -64,7 +64,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return false;
   }
 
-  private die(): void {
+  protected die(): void {
     this.dead = true;
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
     this.scene.tweens.add({

@@ -1,7 +1,7 @@
 import type { InputState } from "../input/input-state.ts";
 
 /** Імена станів гравця. Нові стани (glide) додаються разом зі своїми механіками. */
-export type StateName = "idle" | "run" | "jump" | "fall" | "glide" | "hurt" | "dead";
+export type StateName = "idle" | "run" | "jump" | "fall" | "glide" | "charge" | "hurt" | "dead";
 
 /**
  * Контекст кадру для станів. Не залежить від Phaser, тому state machine тестується окремо.
@@ -22,4 +22,12 @@ export interface PlayerContext {
   inWind: boolean;
   /** Напрямок погляду: -1 ліворуч, 1 праворуч */
   facing: -1 | 1;
+  /** Форма жабки доступна на цьому рівні (за замовчуванням ні) */
+  frogEnabled?: boolean;
+  /** Скільки мс поспіль Jump утримується на землі */
+  groundHeldMs?: number;
+  /** Jump відпущено в цьому кадрі після короткого тапу на землі (звичайний стрибок із відкладенням) */
+  jumpTap?: boolean;
+  /** Наступний стан jump не обрізає стрибок при відпусканні Jump (стрибок жабки) */
+  skipJumpCut?: boolean;
 }

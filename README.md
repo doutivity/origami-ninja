@@ -70,6 +70,7 @@ Open <http://localhost:5173/play/> to play. Run `just` with no arguments to see 
 | Jump | `Space` (hold for a higher jump) | `Jump` |
 | Glide | Hold `Space` while falling | Hold `Jump` in the air |
 | Tilt the glider | `↑` slower and longer, `↓` faster and lower | – |
+| Frog leap | Hold `Space` on the ground, release to leap | Hold `Jump` on the ground |
 | Attack | `J` | `Attack` |
 | Restart at the last checkpoint | `R` | Tap the game-over screen |
 

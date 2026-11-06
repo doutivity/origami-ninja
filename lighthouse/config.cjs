@@ -13,6 +13,7 @@ const PAGES = [
   "controls/",
   "devlog/",
   "devlog/prototype/",
+  "devlog/burning-pagoda/",
   "privacy/",
   "play/",
   "404.html",

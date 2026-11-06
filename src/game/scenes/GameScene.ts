@@ -1,10 +1,14 @@
 import Phaser from "phaser";
-import { boxesOverlap } from "../combat/geometry.ts";
+import { type Box, boxesOverlap } from "../combat/geometry.ts";
+import { Archer } from "../enemies/archer.ts";
 import { Enemy } from "../enemies/enemy.ts";
 import { currentPalette, debugMode, hexToNumber, renderScale } from "../env.ts";
 import { type DeathCause, GAME_EVENTS } from "../events.ts";
 import { BurnOverlay } from "../fire/burn-overlay.ts";
 import { FireZone } from "../fire/fire-zone.ts";
+import { RisingFire } from "../fire/rising-fire.ts";
+import { ArrowPool } from "../hazards/arrows.ts";
+import { Beam } from "../hazards/beam.ts";
 import { InputHub } from "../input/hub.ts";
 import { getLevel, nextLevel } from "../level/index.ts";
 import type { LevelDef } from "../level/types.ts";
@@ -34,6 +38,13 @@ export class GameScene extends Phaser.Scene {
   private fires: FireZone[] = [];
   private winds: WindZone[] = [];
   private waters: WaterZone[] = [];
+  private beams: Beam[] = [];
+  private arrows!: ArrowPool;
+  private rise?: RisingFire;
+  /** Скільки мс гравець у грі після респавну: від цього залежить положення стіни вогню */
+  private riseMs = 0;
+  /** Усі платформи як прямокутники (для стріл) */
+  private solidBoxes: Box[] = [];
   private checkpoints: Checkpoint[] = [];
   private shadows!: Shadows;
   private overlay!: BurnOverlay;
@@ -66,6 +77,10 @@ export class GameScene extends Phaser.Scene {
     this.fires = [];
     this.winds = [];
     this.waters = [];
+    this.beams = [];
+    this.rise = undefined;
+    this.riseMs = 0;
+    this.solidBoxes = [];
     this.checkpoints = [];
     this.cullTimer = 0;
     this.lastHp = -1;
@@ -78,7 +93,8 @@ export class GameScene extends Phaser.Scene {
     this.governor = getGovernor();
 
     // Паралакс рахуємо вручну від вікна камери: scrollFactor разом із zoom зсуває фон по вертикалі
-    const bgKey = level.bg === "bamboo" ? TEX.bgBamboo : TEX.bg;
+    const bgKey =
+      level.bg === "bamboo" ? TEX.bgBamboo : level.bg === "pagoda" ? TEX.bgPagoda : TEX.bg;
     this.bg = this.add.image(0, 0, bgKey).setOrigin(0, 0).setDepth(-10);
 
     // Платформи: видимі картинки + статичні фізичні тіла
@@ -90,7 +106,15 @@ export class GameScene extends Phaser.Scene {
         .setScale(1 / rs);
       const zone = this.add.zone(pl.x + pl.width / 2, pl.y + pl.height / 2, pl.width, pl.height);
       this.physics.add.existing(zone, true);
+      // Карниз тримає лише зверху: крізь нього можна стрибати знизу й збоку
+      if (pl.oneWay) {
+        const sb = zone.body as Phaser.Physics.Arcade.StaticBody;
+        sb.checkCollision.down = false;
+        sb.checkCollision.left = false;
+        sb.checkCollision.right = false;
+      }
       solids.push(zone);
+      this.solidBoxes.push({ x: pl.x, y: pl.y, width: pl.width, height: pl.height });
     });
 
     this.physics.world.setBounds(
@@ -106,9 +130,20 @@ export class GameScene extends Phaser.Scene {
     this.hub = new InputHub(this);
     const spawn = cpIndex >= 0 ? (level.checkpoints[cpIndex] ?? level.spawn) : level.spawn;
     this.player = new Player(this, spawn.x, spawn.y);
+    this.player.frogEnabled = level.frog === true;
     this.physics.add.collider(this.player, solids);
 
+    this.arrows = new ArrowPool(this);
     for (const def of level.enemies) this.enemies.push(new Enemy(this, def));
+    for (const def of level.archers ?? [])
+      this.enemies.push(
+        new Archer(
+          this,
+          def,
+          (x, y, dir) => this.arrows.fire(x, y, dir),
+          () => (this.phase === "playing" ? { x: this.player.x, y: this.player.y } : null),
+        ),
+      );
     this.physics.add.collider(this.enemies, solids);
     this.physics.add.overlap(this.player, this.enemies, (_p, e) => this.onEnemyContact(e as Enemy));
 
@@ -127,6 +162,17 @@ export class GameScene extends Phaser.Scene {
     const pal = currentPalette();
     const colors = [hexToNumber(pal.fire), hexToNumber(pal.accent), hexToNumber(pal.paper)];
     for (const def of level.fires) this.fires.push(new FireZone(this, def, colors));
+    for (const def of level.beams ?? []) this.beams.push(new Beam(this, def, pal));
+    if (level.rise) {
+      this.rise = new RisingFire(
+        this,
+        level.width,
+        spawn.y + tuning.rise.gap,
+        level.rise.speedScale ?? 1,
+        colors,
+        hexToNumber(pal.fire),
+      );
+    }
     this.playerEmbers = this.add
       .particles(0, 0, TEX.ember, {
         follow: this.player,
@@ -164,6 +210,11 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.overlayAction, this.onOverlayAction, this);
       this.scene.stop("UIScene");
     });
+    // Підказка рівня лише на першому проході (без чекпоінта); UIScene створюється наступним кадром
+    if (level.hint && cpIndex < 0) {
+      const hint = level.hint;
+      this.time.delayedCall(500, () => this.registry.set("toast", hint));
+    }
     if (!this.registry.get("runStarted")) {
       this.registry.set("runStarted", true);
       this.game.events.emit(GAME_EVENTS.levelStart, { level: level.id });
@@ -192,6 +243,9 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.enemies) e.tick(delta);
     this.enemies = this.enemies.filter((e) => e.active);
 
+    if (this.phase === "playing") this.riseMs += delta;
+    this.rise?.update(this.riseMs);
+    this.applyHazards(delta, time);
     this.applyFire(delta);
     for (const w of this.waters) w.update(delta / 1000);
     this.applySwordHits();
@@ -318,6 +372,8 @@ export class GameScene extends Phaser.Scene {
     for (const f of this.fires) f.applyQuality(q);
     for (const w of this.winds) w.applyQuality(q);
     for (const w of this.waters) w.applyQuality(q);
+    for (const bm of this.beams) bm.applyQuality(q);
+    this.rise?.applyQuality(q);
     this.playerEmbers.maxAliveParticles = Math.max(
       1,
       Math.round(tuning.particles.maxOnPlayer * q.particleScale),
@@ -327,13 +383,37 @@ export class GameScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.qualityChanged, getQuality());
   }
 
+  /** Стріли лучників і палаючі балки: шкода при влучанні. */
+  private applyHazards(deltaMs: number, nowMs: number): void {
+    const b = this.player.body as Phaser.Physics.Arcade.Body;
+    const box = { x: b.x, y: b.y, width: b.width, height: b.height };
+    const playing = this.phase === "playing";
+    this.arrows.update(
+      deltaMs,
+      this.solidBoxes,
+      playing ? box : { x: -9999, y: -9999, width: 0, height: 0 },
+      (x) => this.player.takeDamage(tuning.archer.arrowDamage, x),
+    );
+    for (const beam of this.beams) {
+      beam.update(deltaMs, nowMs);
+      const bb = beam.box;
+      if (playing && bb && boxesOverlap(box, bb))
+        this.player.takeDamage(tuning.beam.damage, beam.x);
+    }
+  }
+
   /** Вогонь і вода: шкода за секунду, обгоряння, плавання у формі човна. */
   private applyFire(deltaMs: number): void {
     const b = this.player.body as Phaser.Physics.Arcade.Body;
     const box = { x: b.x, y: b.y, width: b.width, height: b.height };
     if (this.phase === "playing") {
-      this.player.inFire = this.fires.some((f) => boxesOverlap(box, f.box));
-      if (this.player.inFire) this.player.applyFire(deltaMs / 1000);
+      const inRise = this.rise ? boxesOverlap(box, this.rise.box) : false;
+      this.player.inFire = inRise || this.fires.some((f) => boxesOverlap(box, f.box));
+      if (this.player.inFire)
+        this.player.applyFire(
+          deltaMs / 1000,
+          inRise ? tuning.rise.damagePerSecond : tuning.fire.damagePerSecond,
+        );
 
       // Вода: плавання в орігамі-човнику або потоплення при падінні у воду
       const inWater =
@@ -379,6 +459,7 @@ export class GameScene extends Phaser.Scene {
         this.hitboxGfx.lineStyle(2, 0xff2222, 1).strokeRect(box.x, box.y, box.width, box.height);
     }
     if (!box) return;
+    this.arrows.deflect(box);
     for (const e of this.enemies) {
       if (e.dead || e.lastHitSwing === this.player.attack.swing) continue;
       const b = e.body as Phaser.Physics.Arcade.Body;

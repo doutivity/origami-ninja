@@ -8,8 +8,10 @@ export class JumpState implements PlayerState {
   readonly name = "jump" as const;
   private cut = false;
 
-  enter(): void {
-    this.cut = false;
+  enter(ctx?: PlayerContext): void {
+    // Стрибок жабки вже має потрібну швидкість: не обрізаємо його при відпусканні Jump
+    this.cut = ctx?.skipJumpCut === true;
+    if (ctx) ctx.skipJumpCut = false;
   }
 
   update(ctx: PlayerContext): StateName | null {

@@ -1,5 +1,6 @@
 // Перевірка даних рівня: повертає список помилок (порожній — рівень коректний).
 import { tuning } from "../tuning.ts";
+import { reachableSet } from "./reach.ts";
 import type { LevelDef, PlatformDef } from "./types.ts";
 
 const t = tuning.player;
@@ -61,6 +62,19 @@ export function validateLevel(level: LevelDef): string[] {
   if (level.checkpoints.length === 0) err("no checkpoints");
   if (!under(level.platforms, level.finish.x, level.finish.y))
     err("finish is not standing on a platform");
+  level.archers?.forEach((a, i) => {
+    if (!under(level.platforms, a.x, a.y)) err(`archer ${i}: not standing on a platform`);
+  });
+  level.beams?.forEach((b, i) => {
+    if (b.landY <= b.topY) err(`beam ${i}: lands above where it starts`);
+    if (!under(level.platforms, b.x, b.landY)) err(`beam ${i}: does not land on a platform`);
+    if (b.intervalMs <= 0 || b.offsetMs < 0) err(`beam ${i}: bad timing`);
+  });
+
+  if (level.vertical) {
+    errors.push(...validateVertical(level));
+    return errors;
+  }
   if (level.finish.x < level.spawn.x) err("finish is left of the spawn");
 
   // Хоча б одна прірва, яку без планера не пройти
@@ -72,5 +86,29 @@ export function validateLevel(level: LevelDef): string[] {
     reach = Math.max(reach, p.x + p.width);
   }
   if (widest <= maxPlainJumpDistance()) err("level has no gap that requires the glider");
+  return errors;
+}
+
+/** Вертикальний рівень: фініш угорі, досяжний із жабкою й недосяжний без неї. */
+function validateVertical(level: LevelDef): string[] {
+  const errors: string[] = [];
+  if (level.finish.y >= level.spawn.y) errors.push("finish is not above the spawn");
+  const at = (x: number, y: number) =>
+    level.platforms.find((p) => x >= p.x && x <= p.x + p.width && Math.abs(p.y - y) < 1);
+  const start = at(level.spawn.x, level.spawn.y);
+  const goal = at(level.finish.x, level.finish.y);
+  if (!start || !goal) return errors;
+  const plain = reachableSet(level.platforms, start, tuning.player.jumpVelocity);
+  const withFrog = reachableSet(level.platforms, start, tuning.frog.maxLeap);
+  if (!withFrog.has(goal)) errors.push("finish is unreachable even with the frog leap");
+  if (level.frog && plain.has(goal)) errors.push("finish is reachable without the frog leap");
+  level.checkpoints.forEach((c, i) => {
+    const pl = at(c.x, c.y);
+    if (pl && !withFrog.has(pl)) errors.push(`checkpoint ${i}: unreachable`);
+  });
+  // Кожен карниз має бути досяжним: інакше він «мертвий» і зайвий
+  level.platforms.forEach((pl, i) => {
+    if (!withFrog.has(pl)) errors.push(`platform ${i}: unreachable`);
+  });
   return errors;
 }

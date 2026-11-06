@@ -1,14 +1,26 @@
 // BootScene: один раз генерує всі текстури з тих самих форм, що й сайт, і запускає гру.
 import Phaser from "phaser";
-import { boat, glider, PUPPET_POSES, type PuppetPoseName, puppetFigure } from "../../gfx/ninja.ts";
 import {
+  boat,
+  frog,
+  frogLeap,
+  glider,
+  PUPPET_POSES,
+  type PuppetPoseName,
+  puppetFigure,
+} from "../../gfx/ninja.ts";
+import {
+  archer,
   bambooForest,
   blobShadow,
+  burningBeam,
   checkpointFlag,
   finishGate,
+  fireArrow,
   flameCluster,
   mountains,
   oni,
+  pagodaBackdrop,
   slash,
   waterSurface,
 } from "../../gfx/scene.ts";
@@ -19,12 +31,16 @@ import { rasterize, svgDoc } from "../rasterize.ts";
 import { tuning } from "../tuning.ts";
 
 /** Кадри гравця: пози ляльки, складений у літачок планер та орігамі-човник. */
-export type FrameName = PuppetPoseName | "glide" | "boat";
+export type FrameName = PuppetPoseName | "glide" | "boat" | "frog" | "frogLeap";
 
 export const TEX = {
   ninja: (name: FrameName) => `ninja-${name}`,
   bg: "bg-mountains",
   bgBamboo: "bg-bamboo",
+  bgPagoda: "bg-pagoda",
+  archer: (frame: number) => `archer-${frame}`,
+  arrow: "arrow",
+  beam: "beam",
   water: "water-surface",
   oni: (frame: number) => `oni-${frame}`,
   slash: "slash",
@@ -102,6 +118,21 @@ export class BootScene extends Phaser.Scene {
         frames.set("boat", img);
       }),
     );
+    // Жабка: присід і стрибок (низ присіду опущено до низу текстури)
+    jobs.push(
+      rasterize(svgDoc(128, 128, "0 0 64 64", `<g transform="translate(0 2)">${frog(p)}</g>`)).then(
+        (img) => {
+          this.textures.addImage(TEX.ninja("frog"), img);
+          frames.set("frog", img);
+        },
+      ),
+    );
+    jobs.push(
+      rasterize(svgDoc(128, 128, "0 0 64 64", frogLeap(p))).then((img) => {
+        this.textures.addImage(TEX.ninja("frogLeap"), img);
+        frames.set("frogLeap", img);
+      }),
+    );
     // Чекпоінти, фінішні ворота й тінь-пляма
     add(TEX.checkpoint(false), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, false)));
     add(TEX.checkpoint(true), svgDoc(80, 180, "0 0 40 90", checkpointFlag(p, true)));
@@ -146,11 +177,17 @@ export class BootScene extends Phaser.Scene {
     // Ворог (2 кадри ходьби) і дуга удару мечем
     for (const f of [0, 1] as const) add(TEX.oni(f), svgDoc(96, 120, "0 0 24 30", oni(p, f)));
     add(TEX.slash, svgDoc(200, 120, "0 0 100 60", slash(p)));
+    // Лучник (2 кадри), вогняна стріла й палаюча балка
+    for (const f of [0, 1] as const)
+      add(TEX.archer(f), svgDoc(128, 120, "0 0 32 30", archer(p, f)));
+    add(TEX.arrow, svgDoc(40, 8, "0 0 20 4", fireArrow(p)));
+    add(TEX.beam, svgDoc(128, 80, "0 0 64 40", burningBeam(p)));
 
     // Паралакс-фони: гори та бамбуковий ліс
     const bgW = 1920;
     const bgH = 540;
     add(TEX.bg, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, mountains(p, bgW, bgH, 90)));
+    add(TEX.bgPagoda, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, pagodaBackdrop(p, bgW, bgH)));
     add(TEX.bgBamboo, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, bambooForest(p, bgW, bgH, 50)));
 
     // Платформи для всіх рівнів
@@ -160,10 +197,17 @@ export class BootScene extends Phaser.Scene {
         for (let y = 22; y < pl.height; y += 18) {
           lines.push(`M0,${y}H${pl.width}`);
         }
+        // Карниз пагоди: тонка стрічка з підвішеними зубцями замість товстого блоку
+        const eave = pl.oneWay
+          ? `<rect width="${pl.width}" height="${pl.height}" fill="${p.shade}"/>` +
+            `<rect width="${pl.width}" height="6" fill="${p.ink}"/>` +
+            `<polygon points="${Array.from({ length: Math.floor(pl.width / 22) }, (_, k) => `${k * 22 + 3},${pl.height} ${k * 22 + 11},${pl.height - 9} ${k * 22 + 19},${pl.height}`).join(" ")}" fill="${p.accent}" fill-opacity="0.8"/>`
+          : null;
         const inner =
+          eave ??
           `<rect width="${pl.width}" height="${pl.height}" fill="${p.shade}"/>` +
-          `<path d="${lines.join("")}" stroke="${p.ink}" stroke-opacity="0.16" stroke-width="1" fill="none"/>` +
-          `<rect width="${pl.width}" height="6" fill="${p.ink}"/>`;
+            `<path d="${lines.join("")}" stroke="${p.ink}" stroke-opacity="0.16" stroke-width="1" fill="none"/>` +
+            `<rect width="${pl.width}" height="6" fill="${p.ink}"/>`;
         const svg = svgDoc(
           Math.round(pl.width * rs),
           Math.round(pl.height * rs),
