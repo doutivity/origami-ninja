@@ -9,6 +9,7 @@ const PAGES = [
   { path: "devlog/", title: /Devlog/ },
   { path: "devlog/prototype/", title: /Prototype/ },
   { path: "devlog/burning-pagoda/", title: /Pagoda/ },
+  { path: "devlog/midnight-canyon/", title: /Canyon/ },
   { path: "privacy/", title: /Privacy/ },
 ];
 

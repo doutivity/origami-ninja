@@ -30,12 +30,36 @@ export interface FireDef {
   height: number;
 }
 
-/** Зона висхідного вітру: піднімає планер, шкоди не завдає. */
+/** Вид вітру: lift — висхідний потік, down — спадний, ring — термальне кільце з поштовхом за напрямом. */
+export type WindKind = "lift" | "down" | "ring";
+
+/** Зона вітру: впливає лише на планер, шкоди не завдає. */
 export interface WindDef {
   x: number;
   y: number;
   width: number;
   height: number;
+  /** За замовчуванням "lift" */
+  kind?: WindKind;
+  /** Напрямок поштовху кільця (за замовчуванням праворуч); довжина не важлива */
+  dir?: Point;
+  /** Id флюгера, що вмикає зону: до удару мечем зона неактивна */
+  gate?: string;
+}
+
+/** Флюгер-перемикач: удар мечем відкриває вітрові тунелі з таким gate. y — рівень основи (верх платформи). */
+export interface VaneDef {
+  id: string;
+  x: number;
+  y: number;
+}
+
+/** Паперовий журавлик: висить у повітрі, гойдається й пікірує на гравця. */
+export interface CraneDef {
+  x: number;
+  y: number;
+  /** Піврозмах горизонтального гойдання, px */
+  range: number;
 }
 
 /** Водна зона: x, y — лівий верхній кут поверхні води. */
@@ -90,7 +114,7 @@ export interface LevelDef {
   id: string;
   name: string;
   /** Текстура фону (за замовчуванням "mountains") */
-  bg?: "mountains" | "bamboo" | "pagoda";
+  bg?: "mountains" | "bamboo" | "pagoda" | "canyon";
   /** Вертикальний рівень: ціль угорі, перевірка досяжності замість прірви для планера */
   vertical?: boolean;
   /** Чи доступна форма жабки (заряджений стрибок) */
@@ -108,6 +132,8 @@ export interface LevelDef {
   winds: WindDef[];
   waters?: WaterDef[];
   archers?: ArcherDef[];
+  cranes?: CraneDef[];
+  vanes?: VaneDef[];
   beams?: BeamDef[];
   rise?: RiseDef;
   checkpoints: CheckpointDef[];

@@ -53,9 +53,13 @@ const machine = (initial: StateName) =>
 
 describe("level registry", () => {
   it("lists the pagoda after the bamboo river", () => {
-    expect(LEVELS.map((l) => l.id)).toEqual(["mountain", "bamboo-river", "burning-pagoda"]);
+    expect(LEVELS.map((l) => l.id).slice(0, 3)).toEqual([
+      "mountain",
+      "bamboo-river",
+      "burning-pagoda",
+    ]);
     expect(nextLevel("bamboo-river")?.id).toBe("burning-pagoda");
-    expect(nextLevel("burning-pagoda")).toBeNull();
+    expect(nextLevel("burning-pagoda")?.id).toBe("midnight-canyon");
     expect(getLevel("burning-pagoda")).toBe(burningPagoda);
   });
 });

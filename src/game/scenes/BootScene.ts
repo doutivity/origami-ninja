@@ -14,7 +14,9 @@ import {
   bambooForest,
   blobShadow,
   burningBeam,
+  canyonBackdrop,
   checkpointFlag,
+  crane,
   finishGate,
   fireArrow,
   flameCluster,
@@ -23,6 +25,7 @@ import {
   pagodaBackdrop,
   slash,
   waterSurface,
+  weathervane,
 } from "../../gfx/scene.ts";
 import { burnedPolygon, emberPolygon } from "../combat/burn.ts";
 import { currentPalette, renderScale } from "../env.ts";
@@ -38,6 +41,10 @@ export const TEX = {
   bg: "bg-mountains",
   bgBamboo: "bg-bamboo",
   bgPagoda: "bg-pagoda",
+  bgCanyon: "bg-canyon",
+  crane: (frame: number) => `crane-${frame}`,
+  vane: (open: boolean) => (open ? "vane-open" : "vane-closed"),
+  ring: "ring",
   archer: (frame: number) => `archer-${frame}`,
   arrow: "arrow",
   beam: "beam",
@@ -182,12 +189,26 @@ export class BootScene extends Phaser.Scene {
       add(TEX.archer(f), svgDoc(128, 120, "0 0 32 30", archer(p, f)));
     add(TEX.arrow, svgDoc(40, 8, "0 0 20 4", fireArrow(p)));
     add(TEX.beam, svgDoc(128, 80, "0 0 64 40", burningBeam(p)));
+    // Журавлик (2 кадри змаху), флюгер (закритий/відкритий) і шеврон кільця
+    for (const f of [0, 1] as const) add(TEX.crane(f), svgDoc(96, 64, "0 0 48 32", crane(p, f)));
+    add(TEX.vane(false), svgDoc(80, 220, "0 0 40 110", weathervane(p, false)));
+    add(TEX.vane(true), svgDoc(80, 220, "0 0 40 110", weathervane(p, true)));
+    add(
+      TEX.ring,
+      svgDoc(
+        24,
+        32,
+        "0 0 12 16",
+        '<polyline points="2,2 9,8 2,14" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+      ),
+    );
 
     // Паралакс-фони: гори та бамбуковий ліс
     const bgW = 1920;
     const bgH = 540;
     add(TEX.bg, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, mountains(p, bgW, bgH, 90)));
     add(TEX.bgPagoda, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, pagodaBackdrop(p, bgW, bgH)));
+    add(TEX.bgCanyon, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, canyonBackdrop(p, bgW, bgH)));
     add(TEX.bgBamboo, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, bambooForest(p, bgW, bgH, 50)));
 
     // Платформи для всіх рівнів

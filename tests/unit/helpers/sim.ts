@@ -3,6 +3,7 @@
 import { emptyInput, type InputState } from "../../../src/game/input/input-state.ts";
 import type { LevelDef } from "../../../src/game/level/types.ts";
 import type { PlayerContext } from "../../../src/game/player/context.ts";
+import { ringDirection } from "../../../src/game/player/glide-model.ts";
 import { StateMachine } from "../../../src/game/player/state-machine.ts";
 import { DeadState } from "../../../src/game/player/states/dead.ts";
 import { FallState } from "../../../src/game/player/states/fall.ts";
@@ -26,6 +27,8 @@ export interface SimInput {
   up?: (s: SimState) => boolean;
   down?: (s: SimState) => boolean;
   right?: boolean;
+  /** Вважати відкритими всі вітрові тунелі з gate (флюгери вже вдарено) */
+  openGates?: boolean;
 }
 
 export interface SimState {
@@ -133,9 +136,13 @@ export function simulate(
 
     // 2. Вітер і ввід
     const box = { x: x - d.w / 2, y: feet - d.h, w: d.w, h: d.h };
-    const inWind = level.winds.some((w) =>
-      overlap(box, { x: w.x, y: w.y, w: w.width, h: w.height }),
+    const zone = level.winds.find(
+      (w) =>
+        (w.gate === undefined || input.openGates === true) &&
+        overlap(box, { x: w.x, y: w.y, w: w.width, h: w.height }),
     );
+    const inWind = zone !== undefined;
+    ctx.wind = zone ? { kind: zone.kind ?? "lift", ...ringDirection(zone.dir) } : null;
     const snap: SimState = {
       frame,
       x,

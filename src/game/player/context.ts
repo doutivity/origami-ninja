@@ -1,4 +1,5 @@
 import type { InputState } from "../input/input-state.ts";
+import type { WindEffect } from "./glide-model.ts";
 
 /** Імена станів гравця. Нові стани (glide) додаються разом зі своїми механіками. */
 export type StateName = "idle" | "run" | "jump" | "fall" | "glide" | "charge" | "hurt" | "dead";
@@ -20,6 +21,8 @@ export interface PlayerContext {
   jumpBufferMs: number;
   /** Чи стоїть гравець у зоні висхідного вітру (піднімає лише планер) */
   inWind: boolean;
+  /** Який саме вітер діє (якщо inWind); за замовчуванням — висхідний */
+  wind?: WindEffect | null;
   /** Напрямок погляду: -1 ліворуч, 1 праворуч */
   facing: -1 | 1;
   /** Форма жабки доступна на цьому рівні (за замовчуванням ні) */

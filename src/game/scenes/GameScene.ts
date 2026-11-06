@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { type Box, boxesOverlap } from "../combat/geometry.ts";
 import { Archer } from "../enemies/archer.ts";
+import { Crane } from "../enemies/crane.ts";
 import { Enemy } from "../enemies/enemy.ts";
 import { currentPalette, debugMode, hexToNumber, renderScale } from "../env.ts";
 import { type DeathCause, GAME_EVENTS } from "../events.ts";
@@ -14,6 +15,7 @@ import { getLevel, nextLevel } from "../level/index.ts";
 import type { LevelDef } from "../level/types.ts";
 import { Checkpoint } from "../objects/checkpoint.ts";
 import { Shadows } from "../objects/shadows.ts";
+import { Vane } from "../objects/vane.ts";
 import { Player } from "../player/player.ts";
 import {
   getGovernor,
@@ -39,6 +41,9 @@ export class GameScene extends Phaser.Scene {
   private winds: WindZone[] = [];
   private waters: WaterZone[] = [];
   private beams: Beam[] = [];
+  private vanes: Vane[] = [];
+  /** Літаючі вороги не мають колізій із платформами й тіней */
+  private fliers: Enemy[] = [];
   private arrows!: ArrowPool;
   private rise?: RisingFire;
   /** Скільки мс гравець у грі після респавну: від цього залежить положення стіни вогню */
@@ -78,6 +83,8 @@ export class GameScene extends Phaser.Scene {
     this.winds = [];
     this.waters = [];
     this.beams = [];
+    this.vanes = [];
+    this.fliers = [];
     this.rise = undefined;
     this.riseMs = 0;
     this.solidBoxes = [];
@@ -93,8 +100,13 @@ export class GameScene extends Phaser.Scene {
     this.governor = getGovernor();
 
     // Паралакс рахуємо вручну від вікна камери: scrollFactor разом із zoom зсуває фон по вертикалі
-    const bgKey =
-      level.bg === "bamboo" ? TEX.bgBamboo : level.bg === "pagoda" ? TEX.bgPagoda : TEX.bg;
+    const bgKeys = {
+      bamboo: TEX.bgBamboo,
+      pagoda: TEX.bgPagoda,
+      canyon: TEX.bgCanyon,
+      mountains: TEX.bg,
+    } as const;
+    const bgKey = bgKeys[level.bg ?? "mountains"];
     this.bg = this.add.image(0, 0, bgKey).setOrigin(0, 0).setDepth(-10);
 
     // Платформи: видимі картинки + статичні фізичні тіла
@@ -145,6 +157,14 @@ export class GameScene extends Phaser.Scene {
         ),
       );
     this.physics.add.collider(this.enemies, solids);
+    // Журавлики літають: колізій із платформами немає, але б'ються мечем і зачіпають гравця
+    for (const def of level.cranes ?? []) {
+      const crane = new Crane(this, def, () =>
+        this.phase === "playing" ? { x: this.player.x, y: this.player.y } : null,
+      );
+      this.fliers.push(crane);
+      this.enemies.push(crane);
+    }
     this.physics.add.overlap(this.player, this.enemies, (_p, e) => this.onEnemyContact(e as Enemy));
 
     this.checkpoints = level.checkpoints.map((c, i) => new Checkpoint(this, c, i <= cpIndex));
@@ -155,6 +175,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(5);
 
     for (const def of level.winds) this.winds.push(new WindZone(this, def, currentPalette()));
+    for (const def of level.vanes ?? []) this.vanes.push(new Vane(this, def));
     for (const def of level.waters ?? [])
       this.waters.push(new WaterZone(this, def, currentPalette()));
 
@@ -195,7 +216,8 @@ export class GameScene extends Phaser.Scene {
     this.shadows = new Shadows(this);
     this.shadows.add(this.player, (124 - 64) * tuning.player.spriteScale - 4, 54);
     for (const e of this.enemies)
-      this.shadows.add(e, (116 - 60) * tuning.enemy.spriteScale - 2, 50);
+      if (!this.fliers.includes(e))
+        this.shadows.add(e, (116 - 60) * tuning.enemy.spriteScale - 2, 50);
 
     cam.setBounds(0, 0, level.width, level.height);
     cam.startFollow(this.player, true, tuning.camera.lerp, tuning.camera.lerp);
@@ -434,7 +456,10 @@ export class GameScene extends Phaser.Scene {
       this.player.inWater = false;
     }
     this.playerEmbers.emitting = this.player.inFire && !this.player.dead;
-    this.player.inWind = this.winds.some((w) => boxesOverlap(box, w.box));
+    // Вітер: перша активна зона, у яку потрапив гравець (зони не перетинаються)
+    const wind = this.winds.find((w) => w.active && boxesOverlap(box, w.box));
+    this.player.inWind = wind !== undefined;
+    this.player.wind = wind?.effect ?? null;
     this.overlay.sync(this.player, this.player.burn, this.player.frameName);
 
     // Раз на ~200 мс вирішуємо, яким зонам випускати іскри
@@ -460,6 +485,11 @@ export class GameScene extends Phaser.Scene {
     }
     if (!box) return;
     this.arrows.deflect(box);
+    for (const v of this.vanes) {
+      if (!v.strike(box)) continue;
+      for (const w of this.winds) if (w.gate === v.id) w.unlock();
+      this.registry.set("toast", "The wind has shifted");
+    }
     for (const e of this.enemies) {
       if (e.dead || e.lastHitSwing === this.player.attack.swing) continue;
       const b = e.body as Phaser.Physics.Arcade.Body;
