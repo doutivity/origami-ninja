@@ -81,7 +81,7 @@ describe("kirigami workshop level", () => {
     expect(validateLevel(L)).toEqual([]);
     expect(LEVELS).toContain(L);
     expect(nextLevel("ink-marsh")).toBe(L);
-    expect(nextLevel("kirigami-workshop")).toBeNull();
+    expect(nextLevel("kirigami-workshop")?.id).toBe("paper-sea");
   });
 
   it("has the dash, no glider, soft and tough walls, archer and enemies", () => {

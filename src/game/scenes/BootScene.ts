@@ -22,11 +22,13 @@ import {
   cutPanel,
   finishGate,
   fireArrow,
+  fish,
   flameCluster,
   marshBackdrop,
   mountains,
   oni,
   pagodaBackdrop,
+  seaBackdrop,
   slash,
   waterSurface,
   weathervane,
@@ -49,6 +51,8 @@ export const TEX = {
   bgCanyon: "bg-canyon",
   bgMarsh: "bg-marsh",
   bgWorkshop: "bg-workshop",
+  bgSea: "bg-sea",
+  fish: "fish",
   cut: (levelId: string, i: number) => `cut-${levelId}-${i}`,
   crane: (frame: number) => `crane-${frame}`,
   vane: (open: boolean) => (open ? "vane-open" : "vane-closed"),
@@ -213,6 +217,7 @@ export class BootScene extends Phaser.Scene {
     // Лучник (2 кадри), вогняна стріла й палаюча балка
     for (const f of [0, 1] as const)
       add(TEX.archer(f), svgDoc(128, 120, "0 0 32 30", archer(p, f)));
+    add(TEX.fish, svgDoc(96, 64, "-4 -2 52 34", fish(p)));
     add(TEX.arrow, svgDoc(40, 8, "0 0 20 4", fireArrow(p)));
     add(TEX.beam, svgDoc(128, 80, "0 0 64 40", burningBeam(p)));
     // Журавлик (2 кадри змаху), флюгер (закритий/відкритий) і шеврон кільця
@@ -237,6 +242,7 @@ export class BootScene extends Phaser.Scene {
     add(TEX.bgCanyon, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, canyonBackdrop(p, bgW, bgH)));
     add(TEX.bgMarsh, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, marshBackdrop(p, bgW, bgH)));
     add(TEX.bgWorkshop, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, workshopBackdrop(p, bgW, bgH)));
+    add(TEX.bgSea, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, seaBackdrop(p, bgW, bgH)));
     add(TEX.bgBamboo, svgDoc(bgW, bgH, `0 0 ${bgW} ${bgH}`, bambooForest(p, bgW, bgH, 50)));
 
     // Паперові стіни кірігамі-рівнів

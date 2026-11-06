@@ -77,6 +77,11 @@ export function validateLevel(level: LevelDef): string[] {
       err(`cut ${i}: not standing on a platform`);
     if (c.tough && !level.dash) err(`cut ${i}: tough wall on a level without the dash`);
   });
+  level.fishes?.forEach((f, i) => {
+    if (!level.waters?.some((w) => f.x >= w.x && f.x <= w.x + w.width))
+      err(`fish ${i}: not above a water zone`);
+  });
+  if (level.sail && !level.waters?.length) err("sail on a level without water");
   level.cranes?.forEach((c, i) => {
     if (c.range <= 0) err(`crane ${i}: non-positive range`);
     if (!inWorld(c.x - c.range, c.y) || !inWorld(c.x + c.range, c.y))
@@ -85,6 +90,8 @@ export function validateLevel(level: LevelDef): string[] {
   level.waters?.forEach((w, i) => {
     if (w.width <= 0 || w.height <= 0) err(`water ${i}: non-positive size`);
     if (!inWorld(w.x, w.y)) err(`water ${i}: outside the world`);
+    if (w.wave && (w.wave.amp <= 0 || w.wave.length <= 0 || w.wave.speed <= 0))
+      err(`water ${i}: bad wave`);
   });
   level.checkpoints.forEach((c, i) => {
     if (!under(level.platforms, c.x, c.y)) err(`checkpoint ${i}: not standing on a platform`);

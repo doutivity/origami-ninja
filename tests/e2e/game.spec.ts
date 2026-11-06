@@ -529,6 +529,99 @@ test("Kirigami Workshop: a double-tap on Attack dashes through a tough paper wal
   expect(errors).toEqual([]);
 });
 
+test("Paper Sea Storm: waves move the boat and the sail beats the headwind", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "keyboard flow is covered on desktop");
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+  await page.goto("play/?debug=1");
+  await waitForGame(page);
+
+  type Scene = {
+    scene: { restart(): void };
+    registry: { set(k: string, v: unknown): void };
+    enemies: { texture: { key: string } }[];
+    player?: {
+      x: number;
+      y: number;
+      inWater: boolean;
+      waterSurfaceY: number;
+      setPosition(x: number, y: number): void;
+    };
+  };
+  const snap = () =>
+    page.evaluate(() => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      const p = g.player;
+      return p
+        ? {
+            x: p.x,
+            y: p.y,
+            inWater: p.inWater,
+            surface: p.waterSurfaceY,
+            fish: g.enemies.filter((e) => e.texture.key === "fish").length,
+          }
+        : null;
+    });
+  const dropInto = async (x: number) => {
+    await page.evaluate((px) => {
+      const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+      g.player?.setPosition(px, 400);
+    }, x);
+  };
+
+  await page.evaluate(() => {
+    const g = window.__origami.scene.getScene("GameScene") as unknown as Scene;
+    g.registry.set("levelId", "paper-sea");
+    g.registry.set("checkpoint", -1);
+    g.scene.restart();
+  });
+  await expect.poll(async () => (await snap())?.fish ?? 0, { timeout: 30_000 }).toBeGreaterThan(0);
+  await page.screenshot({ path: "test-results/sea-start.png" });
+
+  // Перше море: човник пливе, а поверхня під ним справді рухається (хвиля)
+  await expect
+    .poll(
+      async () => {
+        const s = await snap();
+        if (s && !s.inWater) await dropInto(1000);
+        return !!s && s.inWater;
+      },
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toBe(true);
+  const surfaces = new Set<number>();
+  for (let i = 0; i < 10; i++) {
+    surfaces.add(Math.round((await snap())?.surface ?? 0));
+    await page.waitForTimeout(150);
+  }
+  expect(surfaces.size).toBeGreaterThan(3);
+
+  // Друге море: зустрічна течія. З вітрилом (утримання Attack) човник просувається вперед
+  await expect
+    .poll(
+      async () => {
+        const s = await snap();
+        if (s && !(s.inWater && s.x > 1900 && s.x < 2200)) await dropInto(2000);
+        return !!s && s.inWater && s.x > 1900 && s.x < 2200;
+      },
+      { timeout: 30_000, intervals: [200] },
+    )
+    .toBe(true);
+  const x0 = (await snap())?.x ?? 0;
+  await page.keyboard.down("ArrowRight");
+  await page.keyboard.down("KeyJ");
+  await expect
+    .poll(async () => ((await snap())?.x ?? 0) - x0, { timeout: 20_000, intervals: [200] })
+    .toBeGreaterThan(60);
+  await page.screenshot({ path: "test-results/sea-sail.png" });
+  await page.keyboard.up("KeyJ");
+  await page.keyboard.up("ArrowRight");
+  expect(errors).toEqual([]);
+});
+
 test.describe("mobile", () => {
   test.skip(({ isMobile }) => !isMobile, "touch controls need a phone profile");
 

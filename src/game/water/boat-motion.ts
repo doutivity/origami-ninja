@@ -8,6 +8,10 @@ export interface BoatInput {
 
 export interface BoatStepIn {
   input: BoatInput;
+  /** Вітрило розгорнуте (утримання Attack на рівні з вітрилом) */
+  sail?: boolean;
+  /** Куди дивиться човник: із вітрилом без ←/→ він іде вперед */
+  facing?: -1 | 1;
   /** Тіло впирається в стіну зліва/справа (берег, пліт) */
   blockedLeft: boolean;
   blockedRight: boolean;
@@ -42,7 +46,10 @@ export function stepBoat(s: BoatStepIn): BoatStepOut {
       exit: true,
     };
   }
-  const targetVx = dir * tuning.boat.speed + s.waterSpeed;
+  // Вітрило: вищий потолок швидкості, а без ←/→ човен іде в бік погляду
+  const heading = dir !== 0 ? dir : s.sail ? (s.facing ?? 1) : 0;
+  const speed = s.sail ? tuning.boat.sailSpeed : tuning.boat.speed;
+  const targetVx = heading * speed + s.waterSpeed;
   return {
     vx: s.vx + (targetVx - s.vx) * Math.min(1, s.dt * 6),
     vy: (s.targetY - s.bodyY) * 8,

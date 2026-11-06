@@ -94,7 +94,19 @@ export const tuning = {
     accel: 1200,
     /** Скільки мс після стрибка з води човник не вмикається знову (щоб можна було вилізти) */
     exitCooldownMs: 450,
+    /** Швидкість із розгорнутим вітрилом (утримання Attack у воді), px/с */
+    sailSpeed: 380,
     body: { width: 70, height: 32, offsetX: 29, offsetY: 92 },
+  },
+  /** Риба-стрибун: період між стрибками, тривалість і висота дуги, зсув по x */
+  fish: {
+    hp: 1,
+    periodMs: 2600,
+    leapMs: 1000,
+    height: 150,
+    drift: 70,
+    spriteScale: 0.7,
+    body: { width: 50, height: 26, offsetX: 23, offsetY: 19 },
   },
   /** Форма жабки: утримання Jump на землі → присід і заряджений стрибок угору */
   frog: {

@@ -87,6 +87,17 @@ export interface WaterDef {
   height: number;
   /** Швидкість поверхневої течії в пікселях/с (додатна — праворуч) */
   currentSpeed?: number;
+  /** Хвилі: поверхня коливається на ±amp px, довжина хвилі length px, швидкість speed рад/с */
+  wave?: { amp: number; length: number; speed: number };
+}
+
+/** Риба-стрибун: x — місце стрибка; y береться з води під нею. */
+export interface FishDef {
+  x: number;
+  /** Зсув у циклі стрибків, мс (щоб риби не стрибали хором) */
+  offsetMs?: number;
+  /** Напрямок дуги (за замовчуванням праворуч) */
+  dir?: -1 | 1;
 }
 
 /** Платформа-карниз пагоди можна проходити знизу (one-way): задається прапорцем у PlatformDef. */
@@ -131,9 +142,11 @@ export interface LevelDef {
   id: string;
   name: string;
   /** Текстура фону (за замовчуванням "mountains") */
-  bg?: "mountains" | "bamboo" | "pagoda" | "canyon" | "marsh" | "workshop";
+  bg?: "mountains" | "bamboo" | "pagoda" | "canyon" | "marsh" | "workshop" | "sea";
   /** Вертикальний рівень: ціль угорі, перевірка досяжності замість прірви для планера */
   vertical?: boolean;
+  /** Вітрило в човнику: утримання Attack у воді прискорює проти течії */
+  sail?: boolean;
   /** Планер вимкнено (закрите приміщення: утримання Jump у падінні нічого не складає) */
   noGlide?: boolean;
   /** Чи доступний ривок-сюрікен (подвійний тап Attack) */
@@ -158,6 +171,7 @@ export interface LevelDef {
   cranes?: CraneDef[];
   inks?: InkDef[];
   cuts?: CutDef[];
+  fishes?: FishDef[];
   vanes?: VaneDef[];
   beams?: BeamDef[];
   rise?: RiseDef;

@@ -3,6 +3,7 @@ import { type Box, boxesOverlap } from "../combat/geometry.ts";
 import { Archer } from "../enemies/archer.ts";
 import { Crane } from "../enemies/crane.ts";
 import { Enemy } from "../enemies/enemy.ts";
+import { Fish } from "../enemies/fish.ts";
 import { currentPalette, debugMode, hexToNumber, renderScale } from "../env.ts";
 import { type DeathCause, GAME_EVENTS } from "../events.ts";
 import { BurnOverlay } from "../fire/burn-overlay.ts";
@@ -112,6 +113,7 @@ export class GameScene extends Phaser.Scene {
       canyon: TEX.bgCanyon,
       marsh: TEX.bgMarsh,
       workshop: TEX.bgWorkshop,
+      sea: TEX.bgSea,
       mountains: TEX.bg,
     } as const;
     const bgKey = bgKeys[level.bg ?? "mountains"];
@@ -161,6 +163,7 @@ export class GameScene extends Phaser.Scene {
     this.player.frogEnabled = level.frog === true;
     this.player.shellEnabled = level.shell === true;
     this.player.dashEnabled = level.dash === true;
+    this.player.sailEnabled = level.sail === true;
     this.player.glideDisabled = level.noGlide === true;
     this.physics.add.collider(this.player, solids);
 
@@ -183,6 +186,14 @@ export class GameScene extends Phaser.Scene {
       );
       this.fliers.push(crane);
       this.enemies.push(crane);
+    }
+    // Риби вистрибують із води: теж без колізій із платформами
+    for (const def of level.fishes ?? []) {
+      const water = level.waters?.find((w) => def.x >= w.x && def.x <= w.x + w.width);
+      if (!water) continue;
+      const fish = new Fish(this, def, water.y);
+      this.fliers.push(fish);
+      this.enemies.push(fish);
     }
     this.physics.add.overlap(this.player, this.enemies, (_p, e) => this.onEnemyContact(e as Enemy));
 
@@ -464,8 +475,10 @@ export class GameScene extends Phaser.Scene {
       if (inWater && !this.player.dead) {
         this.player.inWater = true;
         this.player.waterSpeed = inWater.currentSpeed;
-        this.player.waterSurfaceY = inWater.surfaceY;
-        if (b.y > inWater.surfaceY + 44) {
+        const surface = inWater.surfaceAt(this.player.x);
+        this.player.waterSurfaceY = surface;
+        this.player.waterSlopeDeg = inWater.slopeDegAt(this.player.x);
+        if (b.y > surface + 44) {
           this.player.die("water");
           this.beginDeath("water");
         }

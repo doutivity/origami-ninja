@@ -12,6 +12,7 @@ const PAGES = [
   { path: "devlog/midnight-canyon/", title: /Canyon/ },
   { path: "devlog/ink-marsh/", title: /Ink/ },
   { path: "devlog/kirigami-workshop/", title: /Kirigami|Workshop/ },
+  { path: "devlog/paper-sea/", title: /Sea/ },
   { path: "privacy/", title: /Privacy/ },
 ];
 

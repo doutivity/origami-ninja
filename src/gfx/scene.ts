@@ -341,6 +341,47 @@ export function weathervane(p: Palette, open: boolean): string {
   ].join("");
 }
 
+/** Паперова риба-стрибун 48×32: гранчасте тіло, хвіст і акцентний плавець. Дивиться праворуч. */
+export function fish(p: Palette): string {
+  return `<g stroke="${p.ink}" stroke-width="0.8" stroke-linejoin="round">${[
+    poly("4,16 14,8 30,6 44,16 30,26 14,24", p.paper),
+    poly("14,8 30,6 26,16", p.muted, 'fill-opacity="0.45"'),
+    poly("14,24 30,26 26,16", p.shade, 'fill-opacity="0.7"'),
+    poly("4,16 -2,6 -1,26", p.accent),
+    poly("20,6 26,0 30,6", p.accent),
+    `<circle cx="37" cy="14" r="1.6" fill="${p.ink}"/>`,
+  ].join("")}</g>`;
+}
+
+/** Штормове море: низькі хмари, косі смуги дощу й далекі гребені хвиль. */
+export function seaBackdrop(p: Palette, w: number, h: number): string {
+  const parts: string[] = [];
+  // Хмарні смуги
+  for (let i = 0; i < 7; i++) {
+    const y = 20 + i * 38;
+    parts.push(
+      `<rect x="${((i * 211) % 300) - 120}" y="${y}" width="${w}" height="26" rx="13" fill="${p.shade}" fill-opacity="${0.55 - i * 0.05}"/>`,
+    );
+  }
+  // Дощ
+  for (let i = 0; i < 70; i++) {
+    const x = (i * 97) % w;
+    const y = 40 + ((i * 53) % (h - 120));
+    parts.push(
+      `<line x1="${x}" y1="${y}" x2="${x - 12}" y2="${y + 30}" stroke="${p.muted}" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round"/>`,
+    );
+  }
+  // Далекі гребені
+  for (let i = 0; i < 3; i++) {
+    const base = 360 + i * 44;
+    const pts = [`0,${h}`];
+    for (let x = 0; x <= w; x += 60) pts.push(`${x},${base + ((x / 60) % 2) * 14}`);
+    pts.push(`${w},${h}`);
+    parts.push(poly(pts.join(" "), p.ink, `fill-opacity="${0.12 + i * 0.08}"`));
+  }
+  return parts.join("");
+}
+
 /** Паперова стіна w×h для кірігамі-майстерні: вирізні щілини; товста — з акцентним хрестом-розпіркою. */
 export function cutPanel(p: Palette, w: number, h: number, tough: boolean): string {
   const parts: string[] = [

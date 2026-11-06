@@ -46,6 +46,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   inWater = false;
   waterSpeed = 0;
   waterSurfaceY = 0;
+  /** Нахил хвилі під човником, градуси (виставляє GameScene) */
+  waterSlopeDeg = 0;
+  /** Вітрило доступне на рівні: утримання Attack у воді прискорює човник */
+  sailEnabled = false;
   /** Залишок cooldown повторного входу у воду після стрибка, мс */
   waterExitMs = 0;
   deathCause: "fire" | "enemy" | "fall" | "water" | null = null;
@@ -261,6 +265,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.inWater && !this.dead) {
       const step = stepBoat({
         input,
+        sail: this.sailEnabled && input.attackHeld,
+        facing: ctx.facing,
         blockedLeft: body.blocked.left,
         blockedRight: body.blocked.right,
         vx: ctx.vx,
@@ -371,7 +377,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       // Сюрікен крутиться, поки триває ривок
       angle = (this.scene.time.now * 1.6) % 360;
     } else if (this.inWater) {
-      angle = Math.sin(this.scene.time.now / 160) * 4;
+      // Човник хитається на хвилях; із вітрилом нахиляється вперед
+      const lean = this.sailEnabled && ctx.input.attackHeld ? -6 * ctx.facing : 0;
+      angle =
+        Math.sin(this.scene.time.now / 160) * 3 + this.waterSlopeDeg * 0.6 * ctx.facing + lean;
     } else {
       angle = this.updateGlideAngle(ctx);
     }
